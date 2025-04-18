@@ -1,4 +1,1 @@
 BasedOnStyle: Google
-ColumnLimit: 100
-BinPackArguments: false
-IndentWidth: 4

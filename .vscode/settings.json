@@ -1,4 +1,5 @@
 {
+  "editor.tabSize": 2,
   "files.associations": {
     "iostream": "cpp",
     "__bit_reference": "cpp",
@@ -46,11 +47,5 @@
     "complex": "cpp",
     "sstream": "cpp",
     "algorithm": "cpp"
-},
-"github.copilot.enable": {
-    "*": true,
-    "plaintext": false,
-    "markdown": false,
-    "scminput": false
-}
+  }
 }

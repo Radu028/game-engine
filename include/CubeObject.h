@@ -1,29 +1,35 @@
 #ifndef CUBEOBJECT_H
 #define CUBEOBJECT_H
 
+#include <btBulletDynamicsCommon.h>
+
 #include "GameObject.h"
-#include "raylib.h"
 
 class GameObject;
 
 class CubeObject : public GameObject {
-   protected:
-    float width, height, length;
-    Color color;
+ private:
+  btCollisionShape* collisionShape;
+  btDefaultMotionState* motionState;
+  btRigidBody* rigidBody;
 
-    Texture2D texture;
-    bool hasTexture;
-    Model model;
+  //  protected:
+  //   float width, height, length;
+  Color color;
 
-   public:
-    CubeObject(Vector3 position, float width, float height, float length, Color color,
-               bool hasCollision, const char* texturePath = nullptr);
-    ~CubeObject() override;
+  //   Texture2D texture;
+  //   bool hasTexture;
+  //   Model model;
 
-    BoundingBox getBoundingBox() const;
-    void draw() const override;
+ public:
+  CubeObject(const Vector3& position, float width, float height, float depth,
+             Color color, bool isStatic, const std::string& texturePath = "");
+  ~CubeObject();
 
-    bool checkCollision(const CubeObject& other) const;
+  BoundingBox getBoundingBox() const;
+  void draw() const override;
+
+  bool checkCollision(const CubeObject& other) const;
 };
 
 #endif

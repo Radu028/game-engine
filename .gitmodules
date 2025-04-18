@@ -1,0 +1,6 @@
+[submodule "external/raylib"]
+	path = external/raylib
+	url = https://github.com/raysan5/raylib.git
+[submodule "external/bullet"]
+	path = external/bullet
+	url = https://github.com/bulletphysics/bullet3.git
