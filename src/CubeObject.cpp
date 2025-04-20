@@ -25,7 +25,11 @@
 CubeObject::CubeObject(const Vector3& position, float width, float height,
                        float depth, Color color, bool isStatic,
                        const std::string& texturePath)
-    : GameObject(position, true) {
+    : GameObject(position, true),
+      width(width),
+      height(height),
+      depth(depth),
+      color(color) {
   collisionShape =
       new btBoxShape(btVector3(width * 0.5f, height * 0.5f, depth * 0.5f));
 
@@ -63,14 +67,24 @@ CubeObject::~CubeObject() {
   delete collisionShape;
 }
 
-// BoundingBox CubeObject::getBoundingBox() const {
-//   return (BoundingBox){
-//       (Vector3){position.x - width / 2, position.y - height / 2,
-//                 position.z - length / 2},
-//       (Vector3){position.x + width / 2, position.y + height / 2,
-//                 position.z + length / 2},
-//   };
-// }
+// Calculate the bounding box of the cube based on its collision shape and
+// transform
+BoundingBox CubeObject::getBoundingBox() const {
+  // Get world transform of the rigid body
+  btTransform trans;
+  motionState->getWorldTransform(trans);
+  btVector3 origin = trans.getOrigin();
+  // Convert to raylib Vector3
+  Vector3 pos = {origin.getX(), origin.getY(), origin.getZ()};
+  // Get half extents of the box shape (with margin)
+  const btBoxShape* boxShape = static_cast<const btBoxShape*>(collisionShape);
+  btVector3 halfExtents = boxShape->getHalfExtentsWithMargin();
+  // Construct and return the bounding box
+  return BoundingBox{{pos.x - halfExtents.x(), pos.y - halfExtents.y(),
+                      pos.z - halfExtents.z()},
+                     {pos.x + halfExtents.x(), pos.y + halfExtents.y(),
+                      pos.z + halfExtents.z()}};
+}
 
 // void CubeObject::draw() const {
 //   if (hasTexture) {
@@ -87,16 +101,17 @@ CubeObject::~CubeObject() {
 // }
 
 void CubeObject::draw() const {
+  // Draw cube at its stored position and dimensions
+  DrawCube(position, width, height, depth, color);
+}
+
+// Synchronize position from physics before drawing
+void CubeObject::update(float deltaTime) {
   btTransform trans;
-  rigidBody->getMotionState()->getWorldTransform(trans);
+  motionState->getWorldTransform(trans);
   btVector3 origin = trans.getOrigin();
-
-  Vector3 currentPosition = {origin.getX(), origin.getY(), origin.getZ()};
-
-  DrawCube(currentPosition,
-           rigidBody->getCollisionShape()->getLocalScaling().getX() * 2,
-           rigidBody->getCollisionShape()->getLocalScaling().getY() * 2,
-           rigidBody->getCollisionShape()->getLocalScaling().getZ() * 2, color);
+  // Update the base class position
+  position = {origin.getX(), origin.getY(), origin.getZ()};
 }
 
 bool CubeObject::checkCollision(const CubeObject& other) const {

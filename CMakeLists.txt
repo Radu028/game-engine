@@ -4,39 +4,36 @@ project(GameProject LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(FetchContent)
+include(cmake/CPM.cmake)
 
-FetchContent_Declare(
-  raylib
+# Configure Raylib build options before fetching
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
+set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(INSTALL_LIBS OFF CACHE BOOL "" FORCE)
+
+CPMAddPackage(
+  NAME        raylib
   GIT_REPOSITORY https://github.com/raysan5/raylib.git
   GIT_TAG        5.5
 )
-set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(raylib)
 
-FetchContent_Declare(
-  reactphysics3d
-  GIT_REPOSITORY https://github.com/DanielChappuis/ReactPhysics3D.git
-  GIT_TAG        0.10.2
-)
-set(RP3D_COMPILE_TESTBED OFF CACHE BOOL "" FORCE)
-set(RP3D_COMPILE_TESTS   OFF CACHE BOOL "" FORCE)
-set(RP3D_PROFILING_ENABLED OFF CACHE BOOL "" FORCE)
-set(RP3D_DOUBLE_PRECISION_ENABLED OFF CACHE BOOL "" FORCE)
+# Find the Bullet library and get include dirs and library list vars
+find_package(Bullet 3.25 REQUIRED)
 
-FetchContent_MakeAvailable(reactphysics3d)
-
-include_directories(include)
+# Removed global include_directories to use target-based includes only
 
 file(GLOB SOURCES "src/*.cpp")
 add_executable(${PROJECT_NAME} ${SOURCES})
+target_include_directories(${PROJECT_NAME} PUBLIC include)
+target_include_directories(${PROJECT_NAME} PRIVATE ${BULLET_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PRIVATE
   raylib
-  ReactPhysics3D::reactphysics3d
+  ${BULLET_LIBRARIES}
 )
 
 if(APPLE)
   target_link_libraries(${PROJECT_NAME} PRIVATE
-      "-framework CoreVideo" "-framework IOKit"
-      "-framework Cocoa" "-framework OpenGL")
+    "-framework CoreVideo" "-framework IOKit"
+    "-framework Cocoa" "-framework OpenGL")
 endif()

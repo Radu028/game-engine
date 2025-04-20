@@ -1,5 +1,7 @@
 #include "Player.h"
 
+#include <BulletCollision/CollisionDispatch/btGhostObject.h>
+
 #include <cmath>
 
 #include "CubeObject.h"
@@ -9,6 +11,11 @@
 #include "raylib.h"
 
 Player::Player(Vector3 position) : GameObject(position, true) {
+  // Initialize movement and physics state
+  velocity = {0.0f, 0.0f, 0.0f};  // start with no velocity
+  isOnGround = false;             // we will detect ground in first update
+  world = nullptr;                // to be set later via setWorld
+
   head = std::make_unique<CubeObject>((Vector3){0.0f, 0.0f, 0.0f}, 0.8f, 0.8f,
                                       0.8f, BLUE, false);
   torso = std::make_unique<CubeObject>((Vector3){0.0f, 0.0f, 0.0f}, 1.0f, 1.2f,
@@ -35,8 +42,15 @@ Player::Player(Vector3 position) : GameObject(position, true) {
   ghostObject->setCollisionFlags(ghostObject->getCollisionFlags() |
                                  btCollisionObject::CF_CHARACTER_OBJECT);
 
+  // Create character controller with explicit up-axis = Y (index 1)
   characterController =
-      new btKinematicCharacterController(ghostObject, characterShape, 0.35f);
+      new btKinematicCharacterController(ghostObject, characterShape, 0.35f, 1);
+  // Configure gravity magnitude (positive pulls downward), fall speed, and jump
+  // speed
+  characterController->setGravity(
+      std::fabs(PhysicsSettings::GRAVITY_ACCELERATION));
+  characterController->setFallSpeed(std::fabs(PhysicsSettings::MAX_FALL_SPEED));
+  characterController->setJumpSpeed(PhysicsSettings::JUMP_VELOCITY);
 
   auto world = PhysicsEngine::getInstance().getDynamicsWorld();
   world->addCollisionObject(
@@ -55,6 +69,7 @@ Player::~Player() {
 }
 
 void Player::handleInput(float movementSpeed) {
+  // Manual WASD movement and jump
   if (IsKeyDown(KEY_W)) move(FORWARD, movementSpeed);
   if (IsKeyDown(KEY_S)) move(BACKWARD, movementSpeed);
   if (IsKeyDown(KEY_A)) move(LEFT, movementSpeed);
@@ -62,31 +77,29 @@ void Player::handleInput(float movementSpeed) {
   if (IsKeyPressed(KEY_SPACE)) jump();
 }
 
-// void Player::move(Direction direction, float byValue) {
-//   if (!world) return;
-//   Vector3 oldPosition = position;
-
-//   Vector3 newPosition = position;
-//   if (direction == FORWARD) {
-//     newPosition.z -= byValue;
-//   } else if (direction == BACKWARD) {
-//     newPosition.z += byValue;
-//   } else if (direction == LEFT) {
-//     newPosition.x -= byValue;
-//   } else if (direction == RIGHT) {
-//     newPosition.x += byValue;
-//   }
-
-//   // Move along X axis with sliding collision
-//   if (newPosition.x != oldPosition.x) {
-//     moveWithSliding(oldPosition.x, newPosition.x, &position.x);
-//   }
-
-//   // Move along Z axis with sliding collision
-//   if (newPosition.z != oldPosition.z) {
-//     moveWithSliding(oldPosition.z, newPosition.z, &position.z);
-//   }
-// }
+// Professional implementation of move to handle player movement and sliding
+// collisions
+void Player::move(Direction direction, float byValue) {
+  if (!world) return;
+  Vector3 oldPosition = position;
+  Vector3 newPosition = position;
+  if (direction == FORWARD)
+    newPosition.z -= byValue;
+  else if (direction == BACKWARD)
+    newPosition.z += byValue;
+  else if (direction == LEFT)
+    newPosition.x -= byValue;
+  else if (direction == RIGHT)
+    newPosition.x += byValue;
+  // Apply sliding movement along X axis
+  if (newPosition.x != oldPosition.x) {
+    moveWithSliding(oldPosition.x, newPosition.x, &position.x);
+  }
+  // Apply sliding movement along Z axis
+  if (newPosition.z != oldPosition.z) {
+    moveWithSliding(oldPosition.z, newPosition.z, &position.z);
+  }
+}
 
 void Player::jump() {
   if (!isOnGround) return;
@@ -202,17 +215,8 @@ void Player::applyGravity(float deltaTime) {
 }
 
 void Player::update(float deltaTime) {
+  // Manual gravity application
   if (!world) return;
-
-  PhysicsEngine::getInstance().stepSimulation(deltaTime);
-
-  btTransform trans;
-  ghostObject->getWorldTransform(trans);
-  btVector3 org = trans.getOrigin();
-  position = {org.getX(), org.getY, org.getZ()};
-
-  GameObject::draw();
-
   applyGravity(deltaTime);
 
   // Calculate dimensions for ground check

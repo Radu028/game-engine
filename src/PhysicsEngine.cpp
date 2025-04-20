@@ -29,3 +29,5 @@ void PhysicsEngine::stepSimulation(float deltaTime) {
 btDiscreteDynamicsWorld* PhysicsEngine::getDynamicsWorld() const {
   return dynamicsWorld.get();
 }
+
+PhysicsEngine::~PhysicsEngine() {}

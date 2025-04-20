@@ -18,6 +18,8 @@ void GameWorld::addObject(std::shared_ptr<CubeObject> object) {
 }
 
 void GameWorld::update(float deltaTime) {
+  // Step the physics simulation for all objects and character actions
+  PhysicsEngine::getInstance().stepSimulation(deltaTime);
   this->player->update(deltaTime);
 
   for (auto& obj : objects) {

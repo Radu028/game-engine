@@ -17,7 +17,7 @@ int main() {
   camera.fovy = 45.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
-  Player player1((Vector3){0.0f, 2.0f, 0.0f});
+  Player player1((Vector3){0.0f, 2.0f, 0.0f});W A
   GameWorld* world = GameWorld::getInstance(&player1);
   player1.setWorld(world);
 
@@ -31,15 +31,14 @@ int main() {
 
   while (!WindowShouldClose()) {
     player1.handleInput(0.1f);
-
     world->update(GetFrameTime());
 
     BeginDrawing();
     ClearBackground(RAYWHITE);
 
     BeginMode3D(camera);
-    player1.draw();
     world->draw();
+    player1.draw();
     EndMode3D();
 
     EndDrawing();
