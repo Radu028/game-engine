@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "ai/NPC.h"
+#include "objects/Floor.h"
 #include "shop/Shop.h"
 #include "systems/PhysicsSystem.h"
 
@@ -28,6 +29,7 @@ GameWorld::GameWorld(GameObject* player, const std::string& name)
   // Set creation timestamp
   auto now = std::time(nullptr);
   std::stringstream ss;
+  ss << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S");
   creationTimestamp = ss.str();
 
   physicsSystem = std::make_unique<PhysicsSystem>(this);
@@ -101,6 +103,7 @@ void GameWorld::initializeNavMesh() {
 
   // First add shop buildings as obstacles
   auto shops = findObjectsOfType<Shop>();
+
   for (const auto& shop : shops) {
     Vector3 shopPos = shop->getPosition();
     Vector3 shopSize = shop->getSize();
@@ -117,6 +120,7 @@ void GameWorld::initializeNavMesh() {
 
     Vector3 entrancePos = shop->getEntrancePosition();
     Vector3 entranceSize = {3.0f, 2.0f, 3.0f};
+
     navigationMesh->defineShopEntrance(entrancePos, entranceSize);
   }
 
@@ -124,6 +128,8 @@ void GameWorld::initializeNavMesh() {
   for (const auto& obj : objects) {
     if (!obj || !obj->getIsStatic()) continue;
     if (std::dynamic_pointer_cast<Shop>(obj)) continue;
+    if (std::dynamic_pointer_cast<Floor>(obj))
+      continue;  // Exclude Floor objects - they should be walkable ground
 
     Vector3 pos = obj->getPosition();
     Vector3 size = obj->getObstacleSize();
@@ -180,14 +186,15 @@ void GameWorld::addObjectAsObstacleDeferred(std::shared_ptr<GameObject> object,
     std::string obstacleType = type.empty() ? object->getObstacleType() : type;
 
     // Add obstacle but don't rebuild connections yet
-    navigationMesh->markNodesInArea(
-        pos, size, false,
-        obstacleType == "shelf"  ? 0.7f
-        : obstacleType == "wall" ? 0.3f
-                                  : 0.5f,
-        obstacleType == "shelf");
+    navigationMesh->markNodesInArea(pos, size, false,
+                                    obstacleType == "shelf"  ? 0.4f
+                                    : obstacleType == "wall" ? 0.2f
+                                                             : 0.3f,
+                                    obstacleType == "shelf");
 
   } else {
+    // If navigation mesh is not initialized yet, we should still add the object
+    // The navigation mesh will account for it when it's later initialized
   }
 }
 

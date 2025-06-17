@@ -167,6 +167,24 @@ void NPC::setDestination(Vector3 destination) {
     if (!path.empty()) {
       pathWaypoints = path;
     } else {
+      // Try to find a position closer to the target that is walkable
+      Vector3 currentPos = getPosition();
+      Vector3 direction = Vector3Subtract(destination, currentPos);
+      direction = Vector3Normalize(direction);
+
+      // Try intermediate positions along the direction
+      for (float distance = 2.0f; distance <= 10.0f; distance += 2.0f) {
+        Vector3 intermediatePos =
+            Vector3Add(currentPos, Vector3Scale(direction, distance));
+        if (navMesh->isWalkable(intermediatePos)) {
+          std::vector<Vector3> partialPath =
+              navMesh->findPath(getPosition(), intermediatePos);
+          if (!partialPath.empty()) {
+            pathWaypoints = partialPath;
+            break;
+          }
+        }
+      }
     }
   }
 }

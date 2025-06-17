@@ -33,7 +33,8 @@ void NavMesh::connectNodes() {
 
       float distance = Vector3Distance(nodes[i].position, nodes[j].position);
 
-      float maxConnectionDistance = nodeSpacing * 2.0f;
+      // Increased connection distance for better connectivity
+      float maxConnectionDistance = nodeSpacing * 2.5f;  // Was 2.0f, now 2.5f
 
       if (distance <= maxConnectionDistance &&
           hasLineOfSight(nodes[i].position, nodes[j].position)) {
@@ -47,15 +48,14 @@ void NavMesh::connectNodes() {
 // Obstacle management system
 void NavMesh::addObstacle(Vector3 position, Vector3 size,
                           const std::string& type) {
-  float expansionFactor = 0.5f;
+  float expansionFactor = 0.3f;
   if (type == "shelf") {
-    expansionFactor = 0.7f;
+    expansionFactor = 0.4f;
   } else if (type == "wall") {
-    expansionFactor = 0.3f;
+    expansionFactor = 0.2f;
   }
 
-  markNodesInArea(position, size, false, expansionFactor,
-                  type == "shelf");
+  markNodesInArea(position, size, false, expansionFactor, type == "shelf");
 
   rebuildConnections();
 }
@@ -256,14 +256,35 @@ bool NavMesh::hasLineOfSight(Vector3 from, Vector3 to) const {
 
   direction = Vector3Normalize(direction);
 
-  int samples = static_cast<int>(distance / 0.5f) + 1;
+  // Reduced sample rate for better performance and less restrictive checking
+  int samples = static_cast<int>(distance / 1.0f) +
+                1;  // Was 0.5f, now 1.0f for fewer samples
+
+  // Limit maximum number of samples to prevent performance issues
+  if (samples > 10) {
+    samples = 10;
+  }
 
   for (int i = 1; i < samples; ++i) {
     float t = static_cast<float>(i) / static_cast<float>(samples);
     Vector3 samplePoint =
         Vector3Add(from, Vector3Scale(direction, distance * t));
 
-    if (!isWalkable(samplePoint)) {
+    // Direct node check instead of recursive isWalkable call
+    int nearestNode = -1;
+    float minDistance = INFINITY;
+
+    for (size_t j = 0; j < nodes.size(); ++j) {
+      float nodeDistance = Vector3Distance(samplePoint, nodes[j].position);
+      if (nodeDistance < minDistance) {
+        minDistance = nodeDistance;
+        nearestNode = static_cast<int>(j);
+      }
+    }
+
+    // More lenient distance threshold and walkability check
+    if (nearestNode == -1 || minDistance > nodeSpacing * 2.0f ||
+        !nodes[nearestNode].walkable) {
       return false;
     }
   }
