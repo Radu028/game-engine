@@ -24,4 +24,7 @@ class Floor : public StaticWorldObject {
   void draw() const override;
   BoundingBox getBoundingBox() const override;
   std::unique_ptr<GameObject> clone() const override;
+
+  // Floor should not block pathfinding - it's the surface NPCs walk on
+  std::string getObstacleType() const override { return "floor"; }
 };

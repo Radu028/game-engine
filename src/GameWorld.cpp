@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "ai/NPC.h"
+#include "ai/NavMesh.h"
 #include "shop/Shop.h"
 #include "systems/PhysicsSystem.h"
 
@@ -50,6 +51,14 @@ void GameWorld::addObject(std::shared_ptr<GameObject> object) {
   if (physicsSystem) {
     physicsSystem->addObject(object.get());
   }
+
+  // Automatically register object with NavMesh for professional pathfinding
+  if (navigationMesh) {
+    // Skip NPC bodies from being treated as obstacles when registering
+    if (object->getObstacleType() != "npc") {
+      navigationMesh->registerObject(object.get());
+    }
+  }
 }
 
 void GameWorld::removeObject(std::shared_ptr<GameObject> object) {
@@ -57,6 +66,11 @@ void GameWorld::removeObject(std::shared_ptr<GameObject> object) {
 
   if (physicsSystem) {
     physicsSystem->removeObject(object.get());
+  }
+
+  // Automatically unregister object from NavMesh
+  if (navigationMesh) {
+    navigationMesh->unregisterObject(object.get());
   }
 
   objects.erase(std::remove_if(objects.begin(), objects.end(),
@@ -77,6 +91,11 @@ void GameWorld::update(float deltaTime) {
     physicsSystem->update(deltaTime);
   }
 
+  // Optimized NavMesh: only cleans up invalid objects, no position updates
+  if (navigationMesh) {
+    navigationMesh->updateAllRegisteredObjects();
+  }
+
   if (player) {
   }
 }
@@ -92,19 +111,31 @@ btDiscreteDynamicsWorld* GameWorld::getBulletWorld() const {
 }
 
 void GameWorld::initializeNavMesh() {
-  // Create navigation mesh covering the game world
-  Vector3 minBounds = {-30.0f, 0.0f, -30.0f};
-  Vector3 maxBounds = {30.0f, 0.0f, 30.0f};
-  navigationMesh = std::make_shared<NavMesh>(minBounds, maxBounds, 1.0f);
+  // Create navigation mesh covering the game world - balanced size for good
+  // performance and coverage
+  Vector3 minBounds = {-25.0f, 0.0f, -25.0f};
+  Vector3 maxBounds = {25.0f, 0.0f, 25.0f};
+  float groundLevel = 0.0f;  // Define ground level for blocking calculations
+
+  navigationMesh = std::make_shared<NavMesh>(
+      minBounds, maxBounds,
+      1.2f,          // Balanced spacing: smaller than 1.5f but larger than 1.0f
+      groundLevel);  // Set ground level for professional blocking calculations
 
   navigationMesh->generateNavMesh();
+
+  // Register all existing objects with the new NavMesh
+  // This calculates blocking ONCE for each static object
+  for (const auto& object : objects) {
+    if (object) {
+      navigationMesh->registerObject(object.get());
+    }
+  }
 
   auto shops = findObjectsOfType<Shop>();
   for (const auto& shop : shops) {
     Vector3 shopPos = shop->getPosition();
     Vector3 shopSize = shop->getSize();
-
-    navigationMesh->addObstacle(shopPos, shopSize);
 
     // Define shop interior as walkable (overrides obstacle for interior)
     navigationMesh->defineShopInterior(shopPos, shopSize);
@@ -115,7 +146,7 @@ void GameWorld::initializeNavMesh() {
     navigationMesh->defineShopEntrance(entrancePos, entranceSize);
   }
 
-  // Rebuild connections now that obstacles are properly defined
+  // Build connections ONCE at the end after all static obstacles are set
   navigationMesh->rebuildConnections();
 
   NPC::setNavMesh(navigationMesh);
@@ -129,11 +160,15 @@ void GameWorld::addObjectAsObstacle(std::shared_ptr<GameObject> object,
   addObject(object);  // Add to world first
 
   if (navigationMesh) {
-    Vector3 pos = object->getPosition();
-    Vector3 size = object->getObstacleSize();
-    std::string obstacleType = type.empty() ? object->getObstacleType() : type;
+    // Only mark nodes if the object actually blocks pathfinding
+    if (navigationMesh->shouldObjectBlockPath(object.get())) {
+      Vector3 pos = object->getPosition();
+      Vector3 size = object->getObstacleSize();
+      std::string obstacleType =
+          type.empty() ? object->getObstacleType() : type;
 
-    navigationMesh->addObstacle(pos, size, obstacleType);
+      navigationMesh->addObstacle(pos, size, obstacleType);
+    }
   }
 }
 
@@ -161,16 +196,19 @@ void GameWorld::addObjectAsObstacleDeferred(std::shared_ptr<GameObject> object,
   addObject(object);  // Add to world first
 
   if (navigationMesh) {
-    Vector3 pos = object->getPosition();
-    Vector3 size = object->getObstacleSize();
-    std::string obstacleType = type.empty() ? object->getObstacleType() : type;
+    // Only mark nodes if the object actually blocks pathfinding
+    if (navigationMesh->shouldObjectBlockPath(object.get())) {
+      Vector3 pos = object->getPosition();
+      Vector3 size = object->getObstacleSize();
+      std::string obstacleType =
+          type.empty() ? object->getObstacleType() : type;
 
-    // Add obstacle but don't rebuild connections yet
-    navigationMesh->markNodesInArea(pos, size, false,
-                                    obstacleType == "shelf"  ? 0.7f
-                                    : obstacleType == "wall" ? 0.3f
-                                                             : 0.5f);
-
+      // Add obstacle but don't rebuild connections yet
+      navigationMesh->markNodesInArea(pos, size, false,
+                                      obstacleType == "shelf"  ? 0.7f
+                                      : obstacleType == "wall" ? 0.3f
+                                                               : 0.5f);
+    }
   } else {
   }
 }

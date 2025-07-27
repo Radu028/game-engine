@@ -104,6 +104,9 @@ class NPC : public HumanoidCharacter {
 
   void interact() override;
 
+  // Object identification for pathfinding
+  std::string getObstacleType() const override { return "npc"; }
+
   // Chat system helpers
   void sayMessage(const std::string& context) const;
 
@@ -111,4 +114,5 @@ class NPC : public HumanoidCharacter {
   void initializeNPC();
   void updateLifetime(float deltaTime);
   Vector3 calculateRandomColor() const;
+  Vector3 findNearestWalkablePosition(Vector3 center, float radius) const;
 };

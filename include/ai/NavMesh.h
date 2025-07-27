@@ -1,9 +1,13 @@
 #pragma once
 
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include "raylib.h"
+
+// Forward declaration
+class GameObject;
 
 // Navigation node for A* pathfinding
 struct NavNode {
@@ -18,6 +22,20 @@ struct NavNode {
   NavNode(Vector3 pos) : position(pos) {}
 };
 
+// Object registration for automatic pathfinding updates
+struct RegisteredObject {
+  GameObject* object;
+  Vector3 lastPosition;
+  Vector3 lastSize;
+  bool wasBlocking;
+
+  RegisteredObject(GameObject* obj)
+      : object(obj),
+        lastPosition({0, 0, 0}),
+        lastSize({0, 0, 0}),
+        wasBlocking(false) {}
+};
+
 // Navigation mesh for pathfinding
 class NavMesh {
  private:
@@ -25,15 +43,33 @@ class NavMesh {
   float nodeSpacing;
   Vector3 minBounds;
   Vector3 maxBounds;
+  float groundLevel;  // Y level of the navmesh ground
+  float npcHeight;    // Height of NPCs for blocking calculations
+
+  // Global object registration for automatic updates
+  std::vector<RegisteredObject> registeredObjects;
+  std::unordered_set<GameObject*> objectSet;  // For fast lookup
 
  public:
-  NavMesh(Vector3 minBounds, Vector3 maxBounds, float spacing = 1.0f);
+  NavMesh(Vector3 minBounds, Vector3 maxBounds, float spacing = 1.0f,
+          float groundY = 0.0f);
 
   // Setup
   void generateNavMesh();
   void rebuildConnections();
 
-  // Obstacle management system
+  // Professional object management system
+  void registerObject(GameObject* object);
+  void unregisterObject(GameObject* object);
+  void updateAllRegisteredObjects();
+  void updateObjectBlocking(GameObject* object);
+
+  // Advanced blocking calculation
+  bool shouldObjectBlockPath(GameObject* object) const;
+  float calculateBlockingHeight(GameObject* object) const;
+  void markObjectNodes(GameObject* object, bool walkable);
+
+  // Legacy obstacle management system (kept for compatibility)
   void addObstacle(Vector3 position, Vector3 size,
                    const std::string& type = "generic");
   void addShelfObstacle(Vector3 shelfPos, Vector3 shelfSize);
@@ -59,6 +95,11 @@ class NavMesh {
   // Utility
   float calculateDistance(int nodeA, int nodeB) const;
   float calculateHeuristic(int nodeA, int nodeB) const;
+  float calculateImprovedHeuristic(int nodeA, int nodeB) const;
+  float calculateMovementPenalty(int currentNode, int neighborNode,
+                                 int targetNode) const;
+  std::vector<int> smoothPath(const std::vector<int>& originalPath) const;
+  int countNearbyObstacles(Vector3 position) const;
   void connectNodes();
   bool hasLineOfSight(Vector3 from, Vector3 to) const;
   bool isNodeFullyAccessible(Vector3 nodePos, Vector3 entrancePos,
@@ -66,8 +107,16 @@ class NavMesh {
   bool isNodeTooCloseToWall(Vector3 nodePos, Vector3 entrancePos,
                             Vector3 entranceSize) const;
 
+  // Configuration
+  void setNPCHeight(float height) { npcHeight = height; }
+  float getNPCHeight() const { return npcHeight; }
+  void setGroundLevel(float y) { groundLevel = y; }
+  float getGroundLevel() const { return groundLevel; }
+
   // Debug
   void debugDraw() const;
   void debugDrawEntranceNodes(Vector3 entrancePos, Vector3 entranceSize) const;
+  void debugDrawRegisteredObjects() const;
   const std::vector<NavNode>& getNodes() const { return nodes; }
+  size_t getRegisteredObjectCount() const { return registeredObjects.size(); }
 };

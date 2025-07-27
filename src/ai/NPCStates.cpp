@@ -199,6 +199,8 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
 
     if (distanceToTarget < 1.5f) {
       hasCurrentTarget = false;
+      // Give NPC time to settle at the target before looking for a new one
+      fruitSearchTimer = -2.0f;  // Prevents immediate retargeting
     }
   }
 
@@ -249,9 +251,14 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
         Vector3 shelfPos = targetShelf->getPosition();
         Vector3 examinePos = {shelfPos.x, npcPos.y, shelfPos.z + 2.0f};
 
-        currentTarget = examinePos;
-        hasCurrentTarget = true;
-        npc->setDestination(currentTarget);
+        // Only set destination if it's significantly different from current
+        // target
+        if (!hasCurrentTarget ||
+            Vector3Distance(examinePos, currentTarget) > 2.0f) {
+          currentTarget = examinePos;
+          hasCurrentTarget = true;
+          npc->setDestination(currentTarget);
+        }
 
         // If very close to shelf, start looking
         if (bestDistance < 2.5f) {
@@ -266,9 +273,14 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
       } else if (!hasCurrentTarget) {
         // No shelf nearby, move to a new random location in shop
         Vector3 newInteriorPosition = shop->getRandomInteriorPosition();
-        currentTarget = newInteriorPosition;
-        hasCurrentTarget = true;
-        npc->setDestination(currentTarget);
+
+        // Only set destination if it's significantly different from last
+        // position
+        if (Vector3Distance(newInteriorPosition, npcPos) > 2.0f) {
+          currentTarget = newInteriorPosition;
+          hasCurrentTarget = true;
+          npc->setDestination(currentTarget);
+        }
       }
     }
     fruitSearchTimer = 0.0f;

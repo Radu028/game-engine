@@ -5,17 +5,24 @@
 #include <iostream>
 #include <queue>
 
+#include "objects/GameObject.h"
 #include "raymath.h"
+#include "settings/Physics.h"
 
-NavMesh::NavMesh(Vector3 minBounds, Vector3 maxBounds, float spacing)
-    : minBounds(minBounds), maxBounds(maxBounds), nodeSpacing(spacing) {}
+NavMesh::NavMesh(Vector3 minBounds, Vector3 maxBounds, float spacing,
+                 float groundY)
+    : minBounds(minBounds),
+      maxBounds(maxBounds),
+      nodeSpacing(spacing),
+      groundLevel(groundY),
+      npcHeight(GameSettings::Character::HEIGHT) {}
 
 void NavMesh::generateNavMesh() {
   nodes.clear();
 
   for (float x = minBounds.x; x <= maxBounds.x; x += nodeSpacing) {
     for (float z = minBounds.z; z <= maxBounds.z; z += nodeSpacing) {
-      Vector3 nodePos = {x, 0.5f, z};
+      Vector3 nodePos = {x, groundLevel + 0.5f, z};
       nodes.emplace_back(nodePos);
     }
   }
@@ -24,27 +31,72 @@ void NavMesh::generateNavMesh() {
 }
 
 void NavMesh::connectNodes() {
+  // Clear all existing connections first
+  for (auto& node : nodes) {
+    node.connections.clear();
+  }
+
+  // OPTIMIZED: O(n) grid-based connection instead of O(n²)
+  // Calculate grid dimensions
+  int gridWidth =
+      static_cast<int>((maxBounds.x - minBounds.x) / nodeSpacing) + 1;
+  int gridHeight =
+      static_cast<int>((maxBounds.z - minBounds.z) / nodeSpacing) + 1;
+
+  // Lambda to convert 2D grid coordinates to 1D node index
+  auto getNodeIndex = [&](int x, int z) -> int {
+    if (x < 0 || x >= gridWidth || z < 0 || z >= gridHeight) return -1;
+    return z * gridWidth + x;
+  };
+
+  // Lambda to convert node index to grid coordinates
+  auto getGridCoords = [&](int nodeIndex) -> std::pair<int, int> {
+    int z = nodeIndex / gridWidth;
+    int x = nodeIndex % gridWidth;
+    return {x, z};
+  };
+
+  // Connect each node only to its immediate neighbors (8-connected)
   for (size_t i = 0; i < nodes.size(); ++i) {
-    for (size_t j = i + 1; j < nodes.size(); ++j) {
-      // Only connect walkable nodes
-      if (!nodes[i].walkable || !nodes[j].walkable) {
-        continue;
-      }
+    if (!nodes[i].walkable) continue;
 
-      float distance = Vector3Distance(nodes[i].position, nodes[j].position);
+    auto [gridX, gridZ] = getGridCoords(i);
 
-      float maxConnectionDistance = nodeSpacing * 2.0f;
+    // Check 8 neighbors (4-directional + 4-diagonal)
+    for (int dx = -1; dx <= 1; ++dx) {
+      for (int dz = -1; dz <= 1; ++dz) {
+        if (dx == 0 && dz == 0) continue;  // Skip self
 
-      if (distance <= maxConnectionDistance &&
-          hasLineOfSight(nodes[i].position, nodes[j].position)) {
-        nodes[i].connections.push_back(j);
-        nodes[j].connections.push_back(i);
+        int neighborIndex = getNodeIndex(gridX + dx, gridZ + dz);
+        if (neighborIndex == -1 ||
+            neighborIndex >= static_cast<int>(nodes.size()))
+          continue;
+        if (!nodes[neighborIndex].walkable) continue;
+
+        // Add bidirectional connection
+        nodes[i].connections.push_back(neighborIndex);
       }
     }
   }
 }
 
-// Obstacle management system
+// Removed addLimitedStrategicConnections() - too expensive O(n²) operation
+// 8-connected grid is sufficient for good pathfinding
+
+int NavMesh::countNearbyObstacles(Vector3 position) const {
+  int count = 0;
+  float checkRadius = nodeSpacing * 2.5f;
+
+  for (const auto& node : nodes) {
+    if (!node.walkable &&
+        Vector3Distance(position, node.position) <= checkRadius) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
 void NavMesh::addObstacle(Vector3 position, Vector3 size,
                           const std::string& type) {
   float expansionFactor = 0.5f;
@@ -56,7 +108,8 @@ void NavMesh::addObstacle(Vector3 position, Vector3 size,
 
   markNodesInArea(position, size, false, expansionFactor);
 
-  rebuildConnections();
+  // Don't rebuild connections here - do it once at the end in
+  // initializeNavMesh()
 }
 
 void NavMesh::defineShopEntrance(Vector3 entrancePos, Vector3 entranceSize) {
@@ -126,6 +179,10 @@ std::vector<Vector3> NavMesh::findPath(Vector3 start, Vector3 end) {
 
   std::vector<int> pathNodes = aStar(startNode, endNode);
 
+  if (pathNodes.empty()) {
+    return {};
+  }
+
   std::vector<Vector3> path;
   for (int nodeIndex : pathNodes) {
     if (nodeIndex >= 0 && nodeIndex < static_cast<int>(nodes.size())) {
@@ -139,15 +196,37 @@ std::vector<Vector3> NavMesh::findPath(Vector3 start, Vector3 end) {
 int NavMesh::findNearestNode(Vector3 position) const {
   int nearestNode = -1;
   float minDistance = INFINITY;
+  int bestConnectivityNode = -1;
+  float bestConnectivityDistance = INFINITY;
 
   for (size_t i = 0; i < nodes.size(); ++i) {
     if (!nodes[i].walkable) continue;
 
     float distance = Vector3Distance(position, nodes[i].position);
+
+    // Standard nearest node selection
     if (distance < minDistance) {
       minDistance = distance;
       nearestNode = static_cast<int>(i);
     }
+
+    // Also consider nodes with better connectivity (more connections)
+    // This can lead to better paths by starting/ending at well-connected nodes
+    if (distance < nodeSpacing * 3.0f && nodes[i].connections.size() >= 4) {
+      float connectivityScore =
+          distance / (1.0f + nodes[i].connections.size() * 0.1f);
+      if (connectivityScore < bestConnectivityDistance) {
+        bestConnectivityDistance = connectivityScore;
+        bestConnectivityNode = static_cast<int>(i);
+      }
+    }
+  }
+
+  // If we found a well-connected node that's reasonably close, prefer it
+  if (bestConnectivityNode != -1 &&
+      bestConnectivityDistance < minDistance * 1.5f &&
+      minDistance > nodeSpacing * 0.8f) {
+    return bestConnectivityNode;
   }
 
   return nearestNode;
@@ -173,6 +252,7 @@ bool NavMesh::isWalkable(Vector3 position) const {
 }
 
 std::vector<int> NavMesh::aStar(int startNode, int endNode) {
+  // Reset all nodes
   for (auto& node : nodes) {
     node.gCost = INFINITY;
     node.hCost = 0.0f;
@@ -180,9 +260,15 @@ std::vector<int> NavMesh::aStar(int startNode, int endNode) {
     node.parent = -1;
   }
 
+  // Improved comparison function with tie-breaking by heuristic
   auto compare = [this](int a, int b) {
+    if (std::abs(nodes[a].fCost - nodes[b].fCost) < 0.001f) {
+      return nodes[a].hCost >
+             nodes[b].hCost;  // Prefer lower heuristic for tie-breaking
+    }
     return nodes[a].fCost > nodes[b].fCost;
   };
+
   std::priority_queue<int, std::vector<int>, decltype(compare)> openSet(
       compare);
   std::vector<bool> inOpenSet(nodes.size(), false);
@@ -195,12 +281,18 @@ std::vector<int> NavMesh::aStar(int startNode, int endNode) {
   openSet.push(startNode);
   inOpenSet[startNode] = true;
 
+  // Early termination check for direct path
+  if (hasLineOfSight(nodes[startNode].position, nodes[endNode].position)) {
+    return {startNode, endNode};
+  }
+
   while (!openSet.empty()) {
     int current = openSet.top();
     openSet.pop();
     inOpenSet[current] = false;
 
     if (current == endNode) {
+      // Reconstruct and smooth path
       std::vector<int> path;
       int node = endNode;
       while (node != -1) {
@@ -208,7 +300,9 @@ std::vector<int> NavMesh::aStar(int startNode, int endNode) {
         node = nodes[node].parent;
       }
       std::reverse(path.begin(), path.end());
-      return path;
+
+      // Apply path smoothing
+      return smoothPath(path);
     }
 
     inClosedSet[current] = true;
@@ -218,13 +312,16 @@ std::vector<int> NavMesh::aStar(int startNode, int endNode) {
         continue;
       }
 
-      float tentativeGCost =
-          nodes[current].gCost + calculateDistance(current, neighbor);
+      // Improved cost calculation with movement penalties
+      float baseCost = calculateDistance(current, neighbor);
+      float movementPenalty =
+          calculateMovementPenalty(current, neighbor, endNode);
+      float tentativeGCost = nodes[current].gCost + baseCost + movementPenalty;
 
       if (tentativeGCost < nodes[neighbor].gCost) {
         nodes[neighbor].parent = current;
         nodes[neighbor].gCost = tentativeGCost;
-        nodes[neighbor].hCost = calculateHeuristic(neighbor, endNode);
+        nodes[neighbor].hCost = calculateImprovedHeuristic(neighbor, endNode);
         nodes[neighbor].fCost = nodes[neighbor].gCost + nodes[neighbor].hCost;
 
         if (!inOpenSet[neighbor]) {
@@ -247,15 +344,90 @@ float NavMesh::calculateHeuristic(int nodeA, int nodeB) const {
   return std::abs(diff.x) + std::abs(diff.z);
 }
 
+float NavMesh::calculateImprovedHeuristic(int nodeA, int nodeB) const {
+  Vector3 posA = nodes[nodeA].position;
+  Vector3 posB = nodes[nodeB].position;
+  Vector3 diff = Vector3Subtract(posB, posA);
+
+  // Use Euclidean distance as base (more accurate than Manhattan)
+  float euclideanDistance = Vector3Length(diff);
+
+  // Add penalty for being near obstacles (encourages staying in open areas)
+  float obstaclePenalty = 0.0f;
+  int nearbyObstacles = 0;
+
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    if (i == nodeA || nodes[i].walkable) continue;
+
+    float distanceToObstacle = Vector3Distance(posA, nodes[i].position);
+    if (distanceToObstacle < nodeSpacing * 2.0f) {
+      nearbyObstacles++;
+      obstaclePenalty += (nodeSpacing * 2.0f - distanceToObstacle) * 0.1f;
+    }
+  }
+
+  // Slight preference for straight-line paths
+  Vector3 direction = Vector3Normalize(diff);
+  float straightnessPenalty = 0.0f;
+  if (nodes[nodeA].parent != -1) {
+    Vector3 prevDirection =
+        Vector3Subtract(posA, nodes[nodes[nodeA].parent].position);
+    if (Vector3Length(prevDirection) > 0.1f) {
+      prevDirection = Vector3Normalize(prevDirection);
+      float dot = Vector3DotProduct(direction, prevDirection);
+      straightnessPenalty =
+          (1.0f - dot) * 0.2f;  // Penalty for direction changes
+    }
+  }
+
+  return euclideanDistance + obstaclePenalty + straightnessPenalty;
+}
+
+float NavMesh::calculateMovementPenalty(int currentNode, int neighborNode,
+                                        int targetNode) const {
+  Vector3 currentPos = nodes[currentNode].position;
+  Vector3 neighborPos = nodes[neighborNode].position;
+  Vector3 targetPos = nodes[targetNode].position;
+
+  float penalty = 0.0f;
+
+  // Penalty for diagonal movement (encourage axis-aligned movement when
+  // possible)
+  Vector3 moveDirection = Vector3Subtract(neighborPos, currentPos);
+  if (std::abs(moveDirection.x) > 0.1f && std::abs(moveDirection.z) > 0.1f) {
+    penalty += 0.1f;  // Small penalty for diagonal moves
+  }
+
+  // Penalty for moving away from target
+  float currentDistanceToTarget = Vector3Distance(currentPos, targetPos);
+  float neighborDistanceToTarget = Vector3Distance(neighborPos, targetPos);
+  if (neighborDistanceToTarget > currentDistanceToTarget) {
+    penalty += 0.05f;  // Very small penalty for moving away from target
+  }
+
+  // Bonus for moving toward areas with more connections (open areas)
+  if (nodes[neighborNode].connections.size() > 6) {
+    penalty -= 0.05f;  // Small bonus for open areas
+  }
+
+  return std::max(0.0f, penalty);
+}
+
 bool NavMesh::hasLineOfSight(Vector3 from, Vector3 to) const {
   Vector3 direction = Vector3Subtract(to, from);
   float distance = Vector3Length(direction);
 
   if (distance < 0.1f) return true;
 
+  // For immediate neighbors (distance < 2.0f), assume line of sight is clear
+  // to avoid expensive checking for grid-adjacent nodes
+  if (distance <= nodeSpacing * 1.5f) return true;
+
   direction = Vector3Normalize(direction);
 
-  int samples = static_cast<int>(distance / 0.5f) + 1;
+  // Reduced sampling for better performance - fewer checks but still effective
+  int samples =
+      std::max(2, static_cast<int>(distance / 1.0f));  // Larger step size
 
   for (int i = 1; i < samples; ++i) {
     float t = static_cast<float>(i) / static_cast<float>(samples);
@@ -330,9 +502,75 @@ std::vector<Vector3> NavMesh::findAlternativePath(Vector3 start, Vector3 end,
     return {};
   }
 
-  // Try multiple alternative pathfinding strategies with different block radii
+  // Strategy 1: Try to find a path that goes around the blocked area
+  Vector3 startToEnd = Vector3Subtract(end, start);
+  Vector3 startToBlocked = Vector3Subtract(blockedArea, start);
+
+  // Determine which side to go around (left or right relative to start->end
+  // direction)
+  float crossProduct =
+      startToEnd.x * startToBlocked.z - startToEnd.z * startToBlocked.x;
+  bool goLeft = crossProduct > 0;
+
+  // Create waypoints that go around the obstacle
+  std::vector<Vector3> alternativeWaypoints;
+  alternativeWaypoints.push_back(start);
+
+  // Calculate perpendicular direction to go around obstacle
+  Vector3 perpDirection;
+  if (goLeft) {
+    perpDirection = {-startToEnd.z, 0, startToEnd.x};  // Rotate 90 degrees left
+  } else {
+    perpDirection = {startToEnd.z, 0,
+                     -startToEnd.x};  // Rotate 90 degrees right
+  }
+  perpDirection = Vector3Normalize(perpDirection);
+
+  // Add intermediate waypoint to go around the obstacle
+  float detourDistance =
+      Vector3Distance(start, blockedArea) + nodeSpacing * 2.0f;
+  Vector3 detourPoint =
+      Vector3Add(blockedArea, Vector3Scale(perpDirection, detourDistance));
+  detourPoint.y = 0.5f;  // Keep at ground level
+
+  // Find nearest walkable node to detour point
+  int detourNode = findNearestNode(detourPoint);
+  if (detourNode != -1 && nodes[detourNode].walkable) {
+    alternativeWaypoints.push_back(nodes[detourNode].position);
+  }
+
+  alternativeWaypoints.push_back(end);
+
+  // Convert waypoints to actual path using navigation mesh
+  std::vector<Vector3> fullAlternativePath;
+
+  for (size_t i = 0; i < alternativeWaypoints.size() - 1; ++i) {
+    std::vector<Vector3> segmentPath =
+        findPath(alternativeWaypoints[i], alternativeWaypoints[i + 1]);
+
+    if (segmentPath.empty()) {
+      // If any segment fails, fall back to original blocked area avoidance
+      break;
+    }
+
+    // Add segment to full path (avoid duplicating waypoints)
+    if (fullAlternativePath.empty()) {
+      fullAlternativePath.insert(fullAlternativePath.end(), segmentPath.begin(),
+                                 segmentPath.end());
+    } else {
+      fullAlternativePath.insert(fullAlternativePath.end(),
+                                 segmentPath.begin() + 1, segmentPath.end());
+    }
+  }
+
+  // If strategic routing worked, return it
+  if (!fullAlternativePath.empty() && fullAlternativePath.size() > 2) {
+    return fullAlternativePath;
+  }
+
+  // Strategy 2: Fallback to original method with progressive blocking
   std::vector<float> blockRadii = {
-      2.0f, 1.5f, 1.0f, 0.5f};  // Try progressively smaller block areas
+      1.5f, 1.0f, 0.5f};  // Reduced radii for less aggressive blocking
 
   for (float blockRadius : blockRadii) {
     // Temporarily mark nodes near the blocked area as unwalkable
@@ -369,7 +607,9 @@ std::vector<Vector3> NavMesh::findAlternativePath(Vector3 start, Vector3 end,
     }
   }
 
-  return {};  // No alternative path found
+  // Strategy 3: Last resort - find any path that avoids the immediate blocked
+  // area
+  return findPath(start, end);
 }
 
 void NavMesh::rebuildConnections() {
@@ -467,69 +707,15 @@ void NavMesh::markNodesInArea(Vector3 center, Vector3 size, bool walkable,
   Vector3 expandedSize = {size.x + margin * 2.0f, size.y,
                           size.z + margin * 2.0f};
 
-  int nodesMarked = 0;
-
   for (auto& node : nodes) {
     Vector3 diff = Vector3Subtract(node.position, center);
 
     // Check if node is within the expanded obstacle area (X and Z only)
-    // For floating obstacles, we project them down to ground level
     if (std::abs(diff.x) <= expandedSize.x / 2.0f &&
         std::abs(diff.z) <= expandedSize.z / 2.0f) {
-      // Special handling for floating shelves - project obstacle influence to
-      // ground level
-      bool shouldMark = false;
-
-      if (center.y > 0.8f) {
-        // This is likely a floating shelf - project down to ground level nodes
-        if (node.position.y <=
-            0.6f) {  // Ground level nodes (NavMesh generates at Y=0.5f)
-          shouldMark = true;
-        }
-      } else {
-        // Regular ground-level obstacle
-        if (std::abs(diff.y) <=
-            expandedSize.y / 2.0f + 1.0f) {  // Allow some Y tolerance
-          shouldMark = true;
-        }
-      }
-
-      if (shouldMark) {
-        // Special handling for shelves near boundaries - use asymmetric
-        // expansion
-        if (!walkable &&
-            center.y > 0.8f) {  // This is a shelf being marked as obstacle
-          // Check if shelf is near shop back boundary (z < -11)
-          if (center.z < -11.0f) {
-            Vector3 asymmetricDiff = Vector3Subtract(node.position, center);
-
-            // Reduce blocking area towards the back wall (negative Z direction)
-            float backMargin =
-                nodeSpacing * 0.3f;  // Reduced margin towards back wall
-            float frontMargin =
-                nodeSpacing * 1.0f;  // Increased margin towards accessible area
-
-            bool inBackArea = (asymmetricDiff.z < 0 &&
-                               std::abs(asymmetricDiff.z) <= backMargin);
-            bool inFrontArea = (asymmetricDiff.z >= 0 &&
-                                std::abs(asymmetricDiff.z) <= frontMargin);
-            bool inSideArea =
-                (std::abs(asymmetricDiff.x) <= nodeSpacing * expansionFactor);
-
-            if ((inBackArea || inFrontArea) && inSideArea) {
-              node.walkable = walkable;
-              nodesMarked++;
-            }
-          } else {
-            // For non-back-wall shelves, use standard marking
-            node.walkable = walkable;
-            nodesMarked++;
-          }
-        } else {
-          // For non-shelf obstacles or walkable marking, use standard behavior
-          node.walkable = walkable;
-          nodesMarked++;
-        }
+      // Only affect ground-level nodes (nodes at NavMesh level)
+      if (std::abs(node.position.y - (groundLevel + 0.5f)) < 0.2f) {
+        node.walkable = walkable;
       }
     }
   }
@@ -554,4 +740,264 @@ bool NavMesh::isPositionBlocked(Vector3 position) const {
     return !nodes[nearestNode].walkable;
   }
   return true;  // Assume blocked if no valid node found
+}
+
+std::vector<int> NavMesh::smoothPath(
+    const std::vector<int>& originalPath) const {
+  if (originalPath.size() <= 2) {
+    return originalPath;
+  }
+
+  std::vector<int> smoothedPath;
+  smoothedPath.push_back(originalPath[0]);  // Always include start
+
+  int currentIndex = 0;
+
+  while (currentIndex < static_cast<int>(originalPath.size()) - 1) {
+    int furthestReachable = currentIndex + 1;
+
+    // Find the furthest node we can reach directly from current position
+    for (int i = currentIndex + 2; i < static_cast<int>(originalPath.size());
+         ++i) {
+      Vector3 currentPos = nodes[originalPath[currentIndex]].position;
+      Vector3 targetPos = nodes[originalPath[i]].position;
+
+      if (hasLineOfSight(currentPos, targetPos)) {
+        furthestReachable = i;
+      } else {
+        break;  // Stop at first unreachable node
+      }
+    }
+
+    // Add the furthest reachable node
+    if (furthestReachable < static_cast<int>(originalPath.size()) - 1) {
+      smoothedPath.push_back(originalPath[furthestReachable]);
+    }
+
+    currentIndex = furthestReachable;
+  }
+
+  // Always include end
+  if (smoothedPath.back() != originalPath.back()) {
+    smoothedPath.push_back(originalPath.back());
+  }
+
+  return smoothedPath;
+}
+
+// Professional object management system
+void NavMesh::registerObject(GameObject* object) {
+  if (!object || objectSet.find(object) != objectSet.end()) {
+    return;  // Already registered or invalid object
+  }
+
+  registeredObjects.emplace_back(object);
+  objectSet.insert(object);
+
+  // Calculate blocking ONCE at registration time
+  std::string objectType = object->getObstacleType();
+  bool shouldBlock = shouldObjectBlockPath(object);
+
+  // Update the registered object info
+  auto& regObj = registeredObjects.back();
+  regObj.lastPosition = object->getPosition();
+  regObj.lastSize = object->getObstacleSize();
+  regObj.wasBlocking = shouldBlock;
+
+  // Apply blocking immediately for static objects
+  if (shouldBlock) {
+    markObjectNodes(object, false);  // Mark as unwalkable
+  }
+}
+
+void NavMesh::unregisterObject(GameObject* object) {
+  if (!object) return;
+
+  // Remove from set first
+  objectSet.erase(object);
+
+  // Find and remove from vector
+  auto it = std::find_if(
+      registeredObjects.begin(), registeredObjects.end(),
+      [object](const RegisteredObject& reg) { return reg.object == object; });
+
+  if (it != registeredObjects.end()) {
+    // If object was blocking, mark its nodes as walkable before removing
+    if (it->wasBlocking) {
+      markObjectNodes(object, true);
+      // Only rebuild if we actually changed something
+      rebuildConnections();
+    }
+    registeredObjects.erase(it);
+  }
+}
+
+void NavMesh::updateAllRegisteredObjects() {
+  // For performance: static objects are NEVER updated after initial setup
+  // NPCs don't need pathfinding updates - they are too small to block
+  // significantly
+
+  // Only clean up invalid objects
+  auto it = registeredObjects.begin();
+  while (it != registeredObjects.end()) {
+    try {
+      // Just verify object is still valid, don't update positions
+      it->object->getPosition();  // This will throw if invalid
+      ++it;
+    } catch (...) {
+      // Object is invalid, remove it
+      objectSet.erase(it->object);
+      it = registeredObjects.erase(it);
+    }
+  }
+}
+
+void NavMesh::updateObjectBlocking(GameObject* object) {
+  if (!object) return;
+
+  // Find the registered object
+  auto it = std::find_if(
+      registeredObjects.begin(), registeredObjects.end(),
+      [object](const RegisteredObject& reg) { return reg.object == object; });
+
+  if (it == registeredObjects.end()) {
+    return;  // Object not registered
+  }
+
+  Vector3 currentPos = object->getPosition();
+  Vector3 currentSize = object->getObstacleSize();
+  bool currentlyBlocking = shouldObjectBlockPath(object);
+
+  // If blocking status changed, update the nodes
+  if (it->wasBlocking != currentlyBlocking) {
+    if (it->wasBlocking && !currentlyBlocking) {
+      // Object no longer blocks, mark old position nodes as walkable
+      markNodesInArea(it->lastPosition, it->lastSize, true);
+    }
+
+    if (!it->wasBlocking && currentlyBlocking) {
+      // Object now blocks, mark nodes underneath as unwalkable
+      markObjectNodes(object, false);
+    }
+  } else if (currentlyBlocking) {
+    // Object still blocks but might have moved
+    float positionDelta = Vector3Distance(currentPos, it->lastPosition);
+    float sizeDelta = Vector3Distance(currentSize, it->lastSize);
+
+    if (positionDelta > nodeSpacing * 0.1f || sizeDelta > nodeSpacing * 0.1f) {
+      // Clear old position - make those nodes walkable again
+      markNodesInArea(it->lastPosition, it->lastSize, true);
+      // Mark new position nodes as unwalkable
+      markObjectNodes(object, false);
+    }
+  } else if (!currentlyBlocking && it->wasBlocking) {
+    // Object no longer blocks, clear any unwalkable nodes from old position
+    markNodesInArea(it->lastPosition, it->lastSize, true);
+  }
+
+  // Update tracking information
+  it->lastPosition = currentPos;
+  it->lastSize = currentSize;
+  it->wasBlocking = currentlyBlocking;
+}
+
+bool NavMesh::shouldObjectBlockPath(GameObject* object) const {
+  if (!object) return false;
+
+  std::string objectType = object->getObstacleType();
+
+  // Floor objects should never block pathfinding - they are the walking surface
+  if (objectType == "floor") {
+    return false;
+  }
+
+  // NPC or other character bodies should not be considered obstacles for
+  // pathfinding
+  if (objectType == "npc" || objectType == "character" ||
+      objectType == "player") {
+    return false;
+  }
+
+  BoundingBox bbox = object->getBoundingBox();
+
+  // If object is underground, it doesn't block
+  if (bbox.max.y < groundLevel) {
+    return false;
+  }
+
+  // Calculate the distance from ground to the bottom of the object
+  float objectBottomY = bbox.min.y;
+  float distanceFromGround = objectBottomY - groundLevel;
+
+  // If the object starts below ground level but extends above it
+  if (distanceFromGround < 0) {
+    distanceFromGround = 0;
+  }
+
+  // Object blocks if the clearance under it is less than OR EQUAL to NPC height
+  return distanceFromGround <= npcHeight;
+}
+
+float NavMesh::calculateBlockingHeight(GameObject* object) const {
+  if (!object) return 0.0f;
+
+  BoundingBox bbox = object->getBoundingBox();
+  float objectBottomY = bbox.min.y;
+  float distanceFromGround = objectBottomY - groundLevel;
+
+  // Return the clearance height (how much space is available under the object)
+  return std::max(0.0f, distanceFromGround);
+}
+
+void NavMesh::markObjectNodes(GameObject* object, bool walkable) {
+  if (!object) return;
+
+  Vector3 objPos = object->getPosition();
+  Vector3 objSize = object->getObstacleSize();
+
+  // Use a professional expansion factor based on object type
+  float expansionFactor = 0.5f;
+  std::string objectType = object->getObstacleType();
+
+  if (objectType == "shelf") {
+    expansionFactor = 0.6f;  // still bigger than default, but less aggressive
+  } else if (objectType == "wall") {
+    expansionFactor = 0.1f;  // minimal expansion for thin walls
+  } else if (objectType == "character" || objectType == "npc") {
+    expansionFactor = 0.2f;  // Minimal expansion for characters
+  }
+
+  markNodesInArea(objPos, objSize, walkable, expansionFactor);
+}
+
+void NavMesh::debugDrawRegisteredObjects() const {
+  for (const auto& regObj : registeredObjects) {
+    if (!regObj.object) continue;
+
+    Vector3 pos = regObj.object->getPosition();
+    Vector3 size = regObj.object->getObstacleSize();
+    BoundingBox bbox = regObj.object->getBoundingBox();
+
+    // Draw bounding box in different colors based on blocking status
+    Color drawColor = regObj.wasBlocking ? RED : GREEN;
+    drawColor.a = 100;  // Semi-transparent
+
+    // Draw wireframe cube for the object
+    DrawCubeWires(pos, size.x, size.y, size.z, drawColor);
+
+    // Draw blocking height visualization
+    if (regObj.wasBlocking) {
+      float blockingHeight = calculateBlockingHeight(regObj.object);
+      Vector3 groundPos = {pos.x, groundLevel, pos.z};
+      Vector3 clearancePos = {pos.x, groundLevel + blockingHeight, pos.z};
+
+      // Draw line from ground to clearance height
+      DrawLine3D(groundPos, clearancePos, ORANGE);
+
+      // Draw NPC height reference
+      Vector3 npcHeightPos = {pos.x, groundLevel + npcHeight, pos.z};
+      DrawLine3D({pos.x - 0.2f, groundLevel + npcHeight, pos.z},
+                 {pos.x + 0.2f, groundLevel + npcHeight, pos.z}, BLUE);
+    }
+  }
 }
