@@ -5,9 +5,6 @@
 
 class InputSystem {
  public:
-  static Vector2 getMovementAxis();
-  static bool isJumpPressed();
-
   // Mouse camera controls (Roblox-style)
   static bool isRightMousePressed();
   static bool isRightMouseDown();

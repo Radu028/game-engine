@@ -28,14 +28,14 @@ int main() {
                        {0.0f, 0.0f, 0.0f},
                        {0.0f, 1.0f, 0.0f},
                        45.0f,
-                       CAMERA_PERSPECTIVE};
+                       (CameraProjection)CAMERA_PERSPECTIVE};
 
     float cameraDistance = 25.0f;
     float cameraAngleX = 0.0f;
     float cameraAngleY = 0.0f;
     const float mouseSensitivity = 0.5f;
     const float minCameraDistance = 5.0f;
-    const float maxCameraDistance = 30.0f;
+    const float maxCameraDistance = 50.0f;
     const float maxVerticalAngle = 89.0f;
     const float minVerticalAngle = -89.0f;
 
