@@ -2,14 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iomanip>
-#include <iostream>
 #include <random>
 
-#include "GameWorld.h"
 #include "ai/NPCStates.h"
 #include "raymath.h"
-#include "settings/Physics.h"
 
 std::shared_ptr<NavMesh> NPC::navMesh = nullptr;
 
@@ -412,28 +408,26 @@ void NPC::interact() {
 }
 
 void NPC::sayMessage(const std::string& context) const {
-  if (chatSystem && chatSystem->canSpeak()) {
-    std::string message;
+  if (!chatSystem || !chatSystem->canSpeak()) {
+    return;
+  }
 
-    if (context == "greeting") {
-      message = chatSystem->getRandomGreeting();
-    } else if (context == "shopping") {
-      message = chatSystem->getRandomShoppingComment();
-    } else if (context == "fruit") {
-      message = chatSystem->getRandomFruitComment();
-    } else if (context == "leaving") {
-      message = chatSystem->getRandomLeavingComment();
-    } else {
-      message = chatSystem->getRandomGeneralComment();
-    }
+  std::string message;
 
-    if (!message.empty()) {
-      chatSystem->addMessage(message, getPosition());
-    }
+  if (context == "greeting") {
+    message = chatSystem->getRandomGreeting();
+  } else if (context == "shopping") {
+    message = chatSystem->getRandomShoppingComment();
+  } else if (context == "fruit") {
+    message = chatSystem->getRandomFruitComment();
+  } else if (context == "leaving") {
+    message = chatSystem->getRandomLeavingComment();
   } else {
-    if (!chatSystem) {
-    } else {
-    }
+    message = chatSystem->getRandomGeneralComment();
+  }
+
+  if (!message.empty()) {
+    // chatSystem->addMessage(message, getPosition());
   }
 }
 

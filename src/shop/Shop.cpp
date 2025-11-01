@@ -1,10 +1,8 @@
 #include "shop/Shop.h"
 
-#include <iostream>
 #include <random>
 
 #include "GameWorld.h"
-#include "objects/Wall.h"
 #include "raymath.h"
 
 Shop::Shop(Vector3 position, Vector3 size)

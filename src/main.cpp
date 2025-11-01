@@ -5,7 +5,7 @@
 #include "GameWorld.h"
 #include "entities/HumanoidCharacter.h"
 #include "exceptions/GameExceptions.h"
-#include "game/FruitShopGame.h"
+#include "game/GameManager.h"
 #include "objects/Floor.h"
 #include "raylib.h"
 #include "settings/Physics.h"
@@ -52,8 +52,7 @@ int main() {
                                              (Vector3){50.0f, 1.0f, 50.0f},
                                              DARKGREEN, true, true));
 
-    FruitShopGame* fruitShopGame = FruitShopGame::getInstance();
-    fruitShopGame->startGame();
+    GameManager* gameManager = GameManager::getInstance();
 
     bool dynamicSun = false;
 
@@ -91,10 +90,6 @@ int main() {
         }
       }
 
-      if (IsKeyPressed(KEY_R)) {
-        fruitShopGame->resetGame();
-      }
-
       InputSystem::updateMouseCamera();
 
       if (InputSystem::isRightMouseDown()) {
@@ -123,7 +118,7 @@ int main() {
                            cameraAngleX);
       player1->update(deltaTime);
 
-      fruitShopGame->update(deltaTime);
+      gameManager->update(deltaTime);
       world->update(deltaTime);
 
       Vector3 playerPos = player1->getFeetPosition();
@@ -149,7 +144,7 @@ int main() {
       BeginMode3D(camera);
       player1->draw();
       world->draw();
-      fruitShopGame->render(camera);
+      gameManager->render(camera);
 
       if (debugMode) {
         player1->drawCollisionBoxes();

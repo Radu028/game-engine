@@ -8,14 +8,11 @@
 #include "shop/Shop.h"
 
 // Enum for different game states
-enum class GameState { STARTING, RUNNING, ENDING, GAME_OVER };
-
 // Game management class using Singleton pattern
-class FruitShopGame {
+class GameManager {
  private:
-  static FruitShopGame* instance;
+  static GameManager* instance;
 
-  GameState currentState;
   std::shared_ptr<Shop> shop;
   NPCManager* npcManager;
   std::unique_ptr<NPCChatSystem> chatSystem;
@@ -23,41 +20,31 @@ class FruitShopGame {
   // Game parameters
   int initialStockPerFruit;
   int totalFruitsInStock;
-  bool gameStarted;
   float gameTimer;
 
   // Statistics
   int fruitsPickedByNPCs;
   int npcsSoFar;
 
-  FruitShopGame();
+  GameManager();
 
  public:
-  ~FruitShopGame();
+  ~GameManager();
 
   // Singleton access
-  static FruitShopGame* getInstance();
+  static GameManager* getInstance();
   static void destroyInstance();
 
   // Game lifecycle
-  void initialize();
   void update(float deltaTime);
   void render(Camera3D camera);
-  void shutdown();
 
   // Game state management
-  void startGame();
-  void endGame();
-  void resetGame();
-  GameState getCurrentState() const { return currentState; }
-
   // Shop access
   std::shared_ptr<Shop> getShop() const { return shop; }
   void setShop(std::shared_ptr<Shop> newShop);
 
   // Game status
-  bool isGameRunning() const { return currentState == GameState::RUNNING; }
-  bool isGameOver() const;
   int getRemainingFruits() const;
 
   // Statistics
@@ -72,12 +59,7 @@ class FruitShopGame {
   // Chat system access
   NPCChatSystem* getChatSystem() const { return chatSystem.get(); }
 
-  // UI/Debug info
-  void drawGameInfo() const;
-  void drawGameStats() const;
-
  private:
   void updateGameLogic(float deltaTime);
-  void checkGameEndConditions();
   void initializeShop();
 };
