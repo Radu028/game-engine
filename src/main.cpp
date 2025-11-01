@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 
@@ -33,7 +34,7 @@ int main() {
     float cameraAngleX = 0.0f;
     float cameraAngleY = 0.0f;
     const float mouseSensitivity = 0.5f;
-    const float minCameraDistance = 50.0f;
+    const float minCameraDistance = 5.0f;
     const float maxCameraDistance = 30.0f;
     const float maxVerticalAngle = 89.0f;
     const float minVerticalAngle = -89.0f;
@@ -108,11 +109,8 @@ int main() {
 
       float wheelMove = GetMouseWheelMove();
       if (wheelMove != 0) {
-        cameraDistance -= wheelMove * 2.0f;
-        if (cameraDistance < minCameraDistance)
-          cameraDistance = minCameraDistance;
-        if (cameraDistance > maxCameraDistance)
-          cameraDistance = maxCameraDistance;
+        cameraDistance = std::clamp(cameraDistance - wheelMove * 2.0f,
+                                    minCameraDistance, maxCameraDistance);
       }
 
       shaderSystem->updateTime(deltaTime);
