@@ -3,13 +3,10 @@
 
 #include <memory>
 #include <string>
-#include <typeinfo>
 #include <unordered_map>
 #include <vector>
 
 #include "ai/NavMesh.h"
-#include "exceptions/GameExceptions.h"
-#include "objects/GameObject.h"
 
 class PhysicsSystem;
 class GameObject;

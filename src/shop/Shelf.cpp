@@ -1,7 +1,6 @@
 #include "shop/Shelf.h"
 
 #include <algorithm>
-#include <cmath>
 
 #include "GameWorld.h"
 #include "raymath.h"

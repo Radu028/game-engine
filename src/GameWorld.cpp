@@ -2,8 +2,6 @@
 
 #include <algorithm>
 #include <ctime>
-#include <iomanip>
-#include <iostream>
 #include <sstream>
 
 #include "ai/NPC.h"

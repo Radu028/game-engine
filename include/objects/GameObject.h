@@ -7,7 +7,6 @@
 
 #include "GameWorld.h"
 #include "raylib.h"
-#include "settings/Physics.h"
 
 class GameWorld;
 

@@ -1,12 +1,15 @@
 #include "game/GameManager.h"
 
+#include <raylib.h>
+
 #include "GameWorld.h"
 #include "ai/NPCManager.h"
 
 GameManager* GameManager::instance = nullptr;
 
-GameManager::GameManager()
-    : npcManager(nullptr),
+GameManager::GameManager(Camera3D camera)
+    : camera(camera),
+      npcManager(nullptr),
       chatSystem(std::make_unique<NPCChatSystem>()),
       initialStockPerFruit(10),
       totalFruitsInStock(0),
@@ -31,9 +34,9 @@ GameManager::GameManager()
 
 GameManager::~GameManager() {}
 
-GameManager* GameManager::getInstance() {
+GameManager* GameManager::getInstance(Camera3D camera) {
   if (instance == nullptr) {
-    instance = new GameManager();
+    instance = new GameManager(camera);
   }
   return instance;
 }
@@ -61,7 +64,7 @@ void GameManager::update(float deltaTime) {
   updateGameLogic(deltaTime);
 }
 
-void GameManager::render(Camera3D camera) {
+void GameManager::render3D() {
   if (chatSystem) {
     chatSystem->drawAllMessages(camera);
   }
@@ -73,6 +76,44 @@ void GameManager::render(Camera3D camera) {
         navMesh->debugDrawEntranceNodes(shop->getEntrancePosition(),
                                         shop->getEntranceSize());
       }
+    }
+  }
+
+  if (npcManager) {
+    for (const auto& npc : npcManager->getActiveNPCs()) {
+      if (!npc || !npc->getIsActive()) {
+        continue;
+      }
+
+      Vector3 torsoPos = npc->getTorsoPosition();
+      DrawSphere({torsoPos.x, torsoPos.y + 1.8f, torsoPos.z}, 0.1f, RED);
+    }
+  }
+}
+
+void GameManager::render2D() {
+  if (npcManager) {
+    for (const auto& npc : npcManager->getActiveNPCs()) {
+      if (!npc || !npc->getIsActive()) {
+        continue;
+      }
+
+      Vector3 torsoPos = npc->getTorsoPosition();
+      Vector3 labelWorld = {torsoPos.x, torsoPos.y + 1.0f, torsoPos.z};
+      Vector2 screenPos = GetWorldToScreen(labelWorld, camera);
+
+      DrawCircleV(screenPos, 5, RED);
+
+      const char* stateCStr = npc->getCurrentStateName();
+      int fontSize = 12;
+      Vector2 textSize =
+          MeasureTextEx(GetFontDefault(), stateCStr, fontSize, 1.0f);
+
+      DrawRectangleV(
+          {labelWorld.x - textSize.x / 2.0f, labelWorld.y - textSize.y / 2.0f},
+          {textSize.x + 8, textSize.y + 4}, {255, 255, 255, 200});
+      DrawTextEx(GetFontDefault(), stateCStr, {labelWorld.x, labelWorld.y},
+                 fontSize, 1, {30, 30, 30, 255});
     }
   }
 }

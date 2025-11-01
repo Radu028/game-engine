@@ -52,7 +52,7 @@ int main() {
                                              (Vector3){50.0f, 1.0f, 50.0f},
                                              DARKGREEN, true, true));
 
-    GameManager* gameManager = GameManager::getInstance();
+    GameManager* gameManager = GameManager::getInstance(camera);
 
     bool dynamicSun = false;
 
@@ -144,13 +144,14 @@ int main() {
       BeginMode3D(camera);
       player1->draw();
       world->draw();
-      gameManager->render(camera);
+      gameManager->render3D();
 
       if (debugMode) {
         player1->drawCollisionBoxes();
       }
       EndMode3D();
 
+      gameManager->render2D();
       EndDrawing();
     }
 

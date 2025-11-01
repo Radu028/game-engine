@@ -1,7 +1,6 @@
 #include "ai/NPCManager.h"
 
 #include <algorithm>
-#include <iostream>
 
 #include "GameWorld.h"
 

@@ -8,7 +8,6 @@
 #include "objects/Floor.h"
 #include "objects/GameObject.h"
 #include "objects/Sphere.h"
-#include "raymath.h"
 #include "settings/Physics.h"
 
 PhysicsSystem::PhysicsSystem(GameWorld* gameWorld) : world(gameWorld) {

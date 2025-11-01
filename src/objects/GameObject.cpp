@@ -6,7 +6,6 @@
 
 #include "GameWorld.h"
 #include "raymath.h"
-#include "settings/Physics.h"
 
 GameObject::GameObject(Vector3 position, bool hasCollision,
                        bool affectedByGravity, bool isStatic)

@@ -1,14 +1,11 @@
 #include "ai/NPCStates.h"
 
 #include <cmath>
-#include <iostream>
 #include <random>
 
 #include "ai/NPC.h"
-#include "ai/NavMesh.h"
 #include "raymath.h"
 #include "shop/Shelf.h"
-#include "shop/Shop.h"
 
 void IdleState::enter(NPC* npc) {
   idleTime = 0.0f;

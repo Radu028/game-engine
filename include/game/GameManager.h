@@ -13,6 +13,7 @@ class GameManager {
  private:
   static GameManager* instance;
 
+  Camera3D camera;
   std::shared_ptr<Shop> shop;
   NPCManager* npcManager;
   std::unique_ptr<NPCChatSystem> chatSystem;
@@ -26,18 +27,19 @@ class GameManager {
   int fruitsPickedByNPCs;
   int npcsSoFar;
 
-  GameManager();
+  GameManager(Camera3D camera);
 
  public:
   ~GameManager();
 
   // Singleton access
-  static GameManager* getInstance();
+  static GameManager* getInstance(Camera3D camera);
   static void destroyInstance();
 
   // Game lifecycle
   void update(float deltaTime);
-  void render(Camera3D camera);
+  void render3D();
+  void render2D();
 
   // Game state management
   // Shop access

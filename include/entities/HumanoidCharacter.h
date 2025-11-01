@@ -2,13 +2,10 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include "BodyPart.h"
-#include "btBulletDynamicsCommon.h"
 #include "objects/GameObject.h"
 #include "raylib.h"
-#include "settings/Physics.h"
 
 class GameWorld;
 

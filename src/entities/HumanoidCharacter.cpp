@@ -6,7 +6,7 @@
 #include "GameWorld.h"
 #include "raylib.h"
 #include "raymath.h"
-#include "systems/InputSystem.h"
+#include "settings/Physics.h"
 
 int HumanoidCharacter::totalCharactersCreated = 0;
 int HumanoidCharacter::activeCharacters = 0;
