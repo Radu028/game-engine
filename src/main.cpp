@@ -31,7 +31,7 @@ int main() {
 
     float cameraDistance = 25.0f;
     float cameraAngleX = 0.0f;
-    float cameraAngleY = -30.0f;
+    float cameraAngleY = 0.0f;
     const float mouseSensitivity = 0.5f;
     const float minCameraDistance = 50.0f;
     const float maxCameraDistance = 30.0f;
