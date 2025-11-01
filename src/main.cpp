@@ -23,18 +23,17 @@ int main() {
       throw GameInitException("Failed to initialize shader system");
     }
 
-    Camera3D camera = {0};
-    camera.position = (Vector3){0.0f, 25.0f, 5.0f};
-    camera.target = (Vector3){0.0f, 0.0f, 0.0f};
-    camera.up = (Vector3){0.0f, 1.0f, 0.0f};
-    camera.fovy = 45.0f;
-    camera.projection = CAMERA_PERSPECTIVE;
+    Camera3D camera = {{0.0f, 5.0f, 5.0f},
+                       {0.0f, 0.0f, 0.0f},
+                       {0.0f, 1.0f, 0.0f},
+                       45.0f,
+                       CAMERA_PERSPECTIVE};
 
     float cameraDistance = 25.0f;
     float cameraAngleX = 0.0f;
     float cameraAngleY = -30.0f;
     const float mouseSensitivity = 0.5f;
-    const float minCameraDistance = 5.0f;
+    const float minCameraDistance = 50.0f;
     const float maxCameraDistance = 30.0f;
     const float maxVerticalAngle = 89.0f;
     const float minVerticalAngle = -89.0f;

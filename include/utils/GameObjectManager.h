@@ -1,7 +1,7 @@
 #pragma once
 
 #include <algorithm>
-#include <functional>
+#include <cmath>
 #include <memory>
 #include <type_traits>
 #include <vector>
@@ -175,7 +175,7 @@ float calculateDistance(const T1& obj1, const T2& obj2) {
   float dy = pos1.y - pos2.y;
   float dz = pos1.z - pos2.z;
 
-  return std::sqrt(dx * dx + dy * dy + dz * dz);
+  return sqrtf(dx * dx + dy * dy + dz * dz);
 }
 
 // Template function for finding nearest object
@@ -232,7 +232,7 @@ std::vector<std::vector<std::shared_ptr<T>>> groupObjectsByDistance(
       float dx = centerPos.x - objPos.x;
       float dy = centerPos.y - objPos.y;
       float dz = centerPos.z - objPos.z;
-      float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+      float distance = sqrtf(dx * dx + dy * dy + dz * dz);
 
       if (distance <= maxDistance) {
         group.push_back(objects[j]);
