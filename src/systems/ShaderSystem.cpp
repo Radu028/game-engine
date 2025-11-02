@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "raylib.h"
+#include "raymath.h"
 
 #ifndef PI
 #define PI 3.14159265358979323846f
@@ -91,7 +92,11 @@ void ShaderSystem::endShaderMode() {
 }
 
 void ShaderSystem::setSunDirection(Vector3 direction) {
-  sunDirection = direction;
+  if (Vector3Length(direction) < 0.0001f) {
+    direction = (Vector3){0.0f, -1.0f, 0.0f};
+  }
+
+  sunDirection = Vector3Normalize(direction);
   if (initialized && sunDirectionLoc != -1) {
     SetShaderValue(lightingShader, sunDirectionLoc, &sunDirection,
                    SHADER_UNIFORM_VEC3);
