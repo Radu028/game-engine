@@ -40,6 +40,19 @@ class ShoppingState : public NPCState {
   std::string getName() override { return "Shopping"; }
 
  private:
+  void handleChatting(NPC* npc);
+  void handleShelfLooking(NPC* npc, float deltaTime);
+  void handleMovement(NPC* npc, float deltaTime);
+  void handleShelfSearch(NPC* npc);
+  bool shouldPurchaseFruit() const;
+  void attemptFruitPurchase(NPC* npc);
+  std::shared_ptr<Shelf> findTargetShelf(
+      NPC* npc, const std::vector<std::shared_ptr<Shelf>>& shelves);
+  bool isShelfVisited(std::shared_ptr<Shelf> shelf) const;
+  void moveToShelfOrRandomLocation(NPC* npc, std::shared_ptr<Shelf> targetShelf,
+                                   float bestDistance);
+  bool shouldLeaveShop(NPC* npc) const;
+
   float shoppingTime = 10.0f;
   float maxShoppingTime = 20.0f;
   float fruitSearchTimer = 0.0f;
@@ -77,6 +90,12 @@ class LeavingState : public NPCState {
   std::string getName() override { return "Leaving"; }
 
  private:
+  void updateStuckDetection(NPC* npc, float deltaTime);
+  void handleStuckSituation(NPC* npc);
+  Vector3 calculateAlternativeTarget(NPC* npc, Vector3 currentPos,
+                                     Vector3 shopCenter);
+  void handleReachedExit(NPC* npc, Vector3 currentPos);
+
   Vector3 exitTarget;
   bool hasExitTarget = false;
 
