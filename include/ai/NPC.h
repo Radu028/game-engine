@@ -88,7 +88,6 @@ class NPC : public HumanoidCharacter {
 
   // Utility methods
   std::shared_ptr<Fruit> findNearestFruit() const;
-  Vector3 getRandomPositionInShop() const;
 
   bool getIsActive() const { return isActive; }
 

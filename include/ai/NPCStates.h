@@ -48,9 +48,7 @@ class ShoppingState : public NPCState {
   void attemptFruitPurchase(NPC* npc);
   std::shared_ptr<Shelf> findTargetShelf(
       NPC* npc, const std::vector<std::shared_ptr<Shelf>>& shelves);
-  bool isShelfVisited(std::shared_ptr<Shelf> shelf) const;
-  void moveToShelfOrRandomLocation(NPC* npc, std::shared_ptr<Shelf> targetShelf,
-                                   float bestDistance);
+  void moveToShelf(NPC* npc, std::shared_ptr<Shelf> shelf);
   bool shouldLeaveShop(NPC* npc) const;
 
   float shoppingTime = 10.0f;
@@ -59,13 +57,11 @@ class ShoppingState : public NPCState {
   float shelfLookingTimer = 0.0f;
   float chatTimer = 0.0f;
   Vector3 currentTarget = {0, 0, 0};
-  bool hasCurrentTarget = false;
   bool isLookingAtShelf = false;
   bool hasPurchasedSomething = false;
   int shelvesVisited = 0;
   int minShelvesToVisit = 2;
   std::shared_ptr<Shelf> currentShelf = nullptr;
-  std::vector<std::shared_ptr<Shelf>> visitedShelves;
 };
 
 class WanderingState : public NPCState {

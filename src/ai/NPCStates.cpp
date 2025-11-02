@@ -28,12 +28,10 @@ void ShoppingState::enter(NPC* npc) {
   fruitSearchTimer = 0.0f;
   shelfLookingTimer = 0.0f;
   chatTimer = 0.0f;
-  hasCurrentTarget = false;
   isLookingAtShelf = false;
   hasPurchasedSomething = false;
   shelvesVisited = 0;
   currentShelf = nullptr;
-  visitedShelves.clear();
 }
 
 void ShoppingState::update(NPC* npc, float deltaTime) {
@@ -56,7 +54,7 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
 
   handleMovement(npc, deltaTime);
 
-  if (fruitSearchTimer >= 2.0f || !hasCurrentTarget) {
+  if (fruitSearchTimer >= 2.0f || !currentShelf) {
     handleShelfSearch(npc);
   }
 
@@ -65,7 +63,7 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
   }
 }
 
-void ShoppingState::exit(NPC* npc) { hasCurrentTarget = false; }
+void ShoppingState::exit(NPC* npc) { currentShelf = nullptr; }
 
 void ShoppingState::handleChatting(NPC* npc) {
   if (chatTimer < 4.0f) return;
@@ -93,7 +91,6 @@ void ShoppingState::handleShelfLooking(NPC* npc, float deltaTime) {
   shelfLookingTimer = 0.0f;
   shelvesVisited++;
   currentShelf = nullptr;
-  hasCurrentTarget = false;
 }
 
 bool ShoppingState::shouldPurchaseFruit() const {
@@ -127,7 +124,7 @@ void ShoppingState::attemptFruitPurchase(NPC* npc) {
 }
 
 void ShoppingState::handleMovement(NPC* npc, float deltaTime) {
-  if (!hasCurrentTarget) return;
+  if (!currentShelf) return;
 
   if (auto navMesh = NPC::getNavMesh()) {
     npc->followPath(deltaTime);
@@ -138,8 +135,8 @@ void ShoppingState::handleMovement(NPC* npc, float deltaTime) {
   Vector3 currentPos = npc->getPosition();
   float distanceToTarget = Vector3Distance(currentPos, currentTarget);
 
-  if (distanceToTarget < 1.5f) {
-    hasCurrentTarget = false;
+  if (distanceToTarget < 1.0f) {
+    currentShelf = nullptr;
     fruitSearchTimer = -2.0f;  // Prevents immediate retargeting
   }
 }
@@ -151,18 +148,9 @@ void ShoppingState::handleShelfSearch(NPC* npc) {
   auto targetShelf = findTargetShelf(npc, shelves);
 
   if (targetShelf) {
-    Vector3 npcPos = npc->getPosition();
-    float bestDistance = Vector3Distance(npcPos, targetShelf->getPosition());
-    moveToShelfOrRandomLocation(npc, targetShelf, bestDistance);
-  } else if (!hasCurrentTarget) {
-    Vector3 npcPos = npc->getPosition();
-    Vector3 newInteriorPosition = npc->getRandomPositionInShop();
-
-    if (Vector3Distance(newInteriorPosition, npcPos) > 2.0f) {
-      currentTarget = newInteriorPosition;
-      hasCurrentTarget = true;
-      npc->setDestination(currentTarget);
-    }
+    moveToShelf(npc, targetShelf);
+  } else {
+    npc->changeState(std::make_unique<IdleState>());
   }
 
   fruitSearchTimer = 0.0f;
@@ -170,62 +158,25 @@ void ShoppingState::handleShelfSearch(NPC* npc) {
 
 std::shared_ptr<Shelf> ShoppingState::findTargetShelf(
     NPC* npc, const std::vector<std::shared_ptr<Shelf>>& shelves) {
-  std::shared_ptr<Shelf> targetShelf = nullptr;
-  float bestDistance = 1000.0f;
-  Vector3 npcPos = npc->getPosition();
-
-  // First priority: find unvisited shelves
-  for (auto shelf : shelves) {
-    if (isShelfVisited(shelf)) continue;
-
-    float distance = Vector3Distance(npcPos, shelf->getPosition());
-    if (distance <= 8.0f && distance < bestDistance) {
-      targetShelf = shelf;
-      bestDistance = distance;
-    }
-  }
-
-  // If no unvisited shelves in range, allow revisiting
-  if (!targetShelf && shelvesVisited < minShelvesToVisit) {
-    for (auto shelf : shelves) {
-      float distance = Vector3Distance(npcPos, shelf->getPosition());
-      if (distance <= 6.0f && distance < bestDistance) {
-        targetShelf = shelf;
-        bestDistance = distance;
-      }
-    }
-  }
-
-  return targetShelf;
+  return shelves[rand() % shelves.size()];
 }
 
-bool ShoppingState::isShelfVisited(std::shared_ptr<Shelf> shelf) const {
-  for (auto visitedShelf : visitedShelves) {
-    if (visitedShelf == shelf) return true;
-  }
-  return false;
-}
-
-void ShoppingState::moveToShelfOrRandomLocation(
-    NPC* npc, std::shared_ptr<Shelf> targetShelf, float bestDistance) {
+void ShoppingState::moveToShelf(NPC* npc, std::shared_ptr<Shelf> shelf) {
   Vector3 npcPos = npc->getPosition();
-  Vector3 shelfPos = targetShelf->getPosition();
+  Vector3 shelfPos = shelf->getPosition();
   Vector3 examinePos = {shelfPos.x, npcPos.y, shelfPos.z + 2.0f};
 
   // Only set destination if it's significantly different
-  if (!hasCurrentTarget || Vector3Distance(examinePos, currentTarget) > 2.0f) {
+  if (Vector3Distance(examinePos, currentTarget) > 2.0f) {
     currentTarget = examinePos;
-    hasCurrentTarget = true;
     npc->setDestination(currentTarget);
   }
 
   // If very close to shelf, start looking
-  if (bestDistance < 2.5f) {
+  if (Vector3Distance(examinePos, npcPos) < 2.5f) {
     isLookingAtShelf = true;
     shelfLookingTimer = 0.0f;
-    currentShelf = targetShelf;
-    hasCurrentTarget = false;
-    visitedShelves.push_back(targetShelf);
+    currentShelf = shelf;
   }
 }
 

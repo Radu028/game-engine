@@ -370,14 +370,6 @@ std::shared_ptr<Fruit> NPC::findNearestFruit() const {
   return targetShop->findNearestFruit(getPosition());
 }
 
-Vector3 NPC::getRandomPositionInShop() const {
-  if (!targetShop) {
-    return getPosition();
-  }
-
-  return targetShop->getRandomInteriorPosition();
-}
-
 void NPC::sayMessage(const std::string& context) const {
   if (!chatSystem || !chatSystem->canSpeak()) {
     return;
