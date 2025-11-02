@@ -57,7 +57,7 @@ class NPC : public HumanoidCharacter {
   // State management
   void changeState(std::unique_ptr<NPCState> newState);
   NPCState* getCurrentState() const { return currentState.get(); }
-  const char* getCurrentStateName() const {
+  std::string getCurrentStateName() const {
     return currentState ? currentState->getName() : "None";
   }
 

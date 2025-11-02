@@ -1,6 +1,8 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 #include "ai/NPCChatSystem.h"
 #include "ai/NPCManager.h"
@@ -27,19 +29,24 @@ class GameManager {
   int fruitsPickedByNPCs;
   int npcsSoFar;
 
-  GameManager(Camera3D camera);
+  std::unordered_map<std::string, Texture2D> npcStatusTextures;
+  float npcStatusBillboardWidth;
+  float npcStatusVerticalOffset;
+  float npcStatusFontSize;
+  int npcStatusPadding;
+
+  GameManager();
 
  public:
   ~GameManager();
 
   // Singleton access
-  static GameManager* getInstance(Camera3D camera);
+  static GameManager* getInstance();
   static void destroyInstance();
 
   // Game lifecycle
   void update(float deltaTime);
-  void render3D();
-  void render2D();
+  void render(Camera3D camera);
 
   // Game state management
   // Shop access
@@ -64,4 +71,8 @@ class GameManager {
  private:
   void updateGameLogic(float deltaTime);
   void initializeShop();
+  void drawNPCStatusBillboard(const std::shared_ptr<NPC>& npc,
+                              const Camera3D& camera);
+  Texture2D& getOrCreateStatusTexture(const std::string& stateText,
+                                      float fontSize, int padding);
 };

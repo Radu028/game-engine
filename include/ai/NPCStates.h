@@ -16,7 +16,7 @@ class NPCState {
   virtual void enter(NPC* npc) = 0;
   virtual void update(NPC* npc, float deltaTime) = 0;
   virtual void exit(NPC* npc) = 0;
-  virtual const char* getName() const = 0;
+  virtual std::string getName() = 0;
 };
 
 // Concrete states
@@ -25,7 +25,7 @@ class IdleState : public NPCState {
   void enter(NPC* npc) override;
   void update(NPC* npc, float deltaTime) override;
   void exit(NPC* npc) override;
-  const char* getName() const override { return "Idle"; }
+  std::string getName() override { return "Idle"; }
 
  private:
   float idleTime = 0.0f;
@@ -37,7 +37,7 @@ class MovingToShopState : public NPCState {
   void enter(NPC* npc) override;
   void update(NPC* npc, float deltaTime) override;
   void exit(NPC* npc) override;
-  const char* getName() const override { return "MovingToShop"; }
+  std::string getName() override { return "MovingToShop"; }
 
  private:
   enum class WaypointStage {
@@ -65,7 +65,7 @@ class ShoppingState : public NPCState {
   void enter(NPC* npc) override;
   void update(NPC* npc, float deltaTime) override;
   void exit(NPC* npc) override;
-  const char* getName() const override { return "Shopping"; }
+  std::string getName() override { return "Shopping"; }
 
  private:
   float shoppingTime = 0.0f;
@@ -88,7 +88,7 @@ class WanderingState : public NPCState {
   void enter(NPC* npc) override;
   void update(NPC* npc, float deltaTime) override;
   void exit(NPC* npc) override;
-  const char* getName() const override { return "Wandering"; }
+  std::string getName() override { return "Wandering"; }
 
  private:
   Vector3 wanderTarget;
@@ -102,7 +102,7 @@ class LeavingState : public NPCState {
   void enter(NPC* npc) override;
   void update(NPC* npc, float deltaTime) override;
   void exit(NPC* npc) override;
-  const char* getName() const override { return "Leaving"; }
+  std::string getName() override { return "Leaving"; }
 
  private:
   Vector3 exitTarget;

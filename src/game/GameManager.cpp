@@ -7,9 +7,8 @@
 
 GameManager* GameManager::instance = nullptr;
 
-GameManager::GameManager(Camera3D camera)
-    : camera(camera),
-      npcManager(nullptr),
+GameManager::GameManager()
+    : npcManager(nullptr),
       chatSystem(std::make_unique<NPCChatSystem>()),
       initialStockPerFruit(10),
       totalFruitsInStock(0),
@@ -34,9 +33,9 @@ GameManager::GameManager(Camera3D camera)
 
 GameManager::~GameManager() {}
 
-GameManager* GameManager::getInstance(Camera3D camera) {
+GameManager* GameManager::getInstance() {
   if (instance == nullptr) {
-    instance = new GameManager(camera);
+    instance = new GameManager();
   }
   return instance;
 }
@@ -64,7 +63,7 @@ void GameManager::update(float deltaTime) {
   updateGameLogic(deltaTime);
 }
 
-void GameManager::render3D() {
+void GameManager::render(Camera3D camera) {
   if (chatSystem) {
     chatSystem->drawAllMessages(camera);
   }
@@ -84,38 +83,71 @@ void GameManager::render3D() {
       if (!npc || !npc->getIsActive()) {
         continue;
       }
-
-      Vector3 torsoPos = npc->getTorsoPosition();
-      DrawSphere({torsoPos.x, torsoPos.y + 1.8f, torsoPos.z}, 0.1f, RED);
+      drawNPCStatusBillboard(npc, camera);
     }
   }
 }
 
-void GameManager::render2D() {
-  if (npcManager) {
-    for (const auto& npc : npcManager->getActiveNPCs()) {
-      if (!npc || !npc->getIsActive()) {
-        continue;
-      }
+void GameManager::drawNPCStatusBillboard(const std::shared_ptr<NPC>& npc,
+                                         const Camera3D& camera) {
+  constexpr float NPC_STATUS_BILLBOARD_WIDTH = 1.4f;
+  constexpr float NPC_STATUS_VERTICAL_OFFSET = 1.8f;
+  constexpr float NPC_STATUS_FONT_SIZE = 26.0f;
+  constexpr int NPC_STATUS_PADDING = 6;
 
-      Vector3 torsoPos = npc->getTorsoPosition();
-      Vector3 labelWorld = {torsoPos.x, torsoPos.y + 1.0f, torsoPos.z};
-      Vector2 screenPos = GetWorldToScreen(labelWorld, camera);
-
-      DrawCircleV(screenPos, 5, RED);
-
-      const char* stateCStr = npc->getCurrentStateName();
-      int fontSize = 12;
-      Vector2 textSize =
-          MeasureTextEx(GetFontDefault(), stateCStr, fontSize, 1.0f);
-
-      DrawRectangleV(
-          {labelWorld.x - textSize.x / 2.0f, labelWorld.y - textSize.y / 2.0f},
-          {textSize.x + 8, textSize.y + 4}, {255, 255, 255, 200});
-      DrawTextEx(GetFontDefault(), stateCStr, {labelWorld.x, labelWorld.y},
-                 fontSize, 1, {30, 30, 30, 255});
-    }
+  if (!npc || !npc->getIsActive()) {
+    return;
   }
+
+  std::string stateText = npc->getCurrentStateName();
+  if (stateText.empty()) {
+    return;
+  }
+
+  Texture2D& texture = getOrCreateStatusTexture(stateText, NPC_STATUS_FONT_SIZE,
+                                                NPC_STATUS_PADDING);
+
+  Vector3 position = npc->getTorsoPosition();
+  position.y += NPC_STATUS_VERTICAL_OFFSET;
+
+  Vector2 size = {
+      NPC_STATUS_BILLBOARD_WIDTH,
+      NPC_STATUS_BILLBOARD_WIDTH * (static_cast<float>(texture.height) /
+                                    static_cast<float>(texture.width))};
+  Vector2 origin = {size.x * 0.5f, size.y};
+
+  Rectangle source = {0.0f, 0.0f, static_cast<float>(texture.width),
+                      static_cast<float>(texture.height)};
+
+  DrawBillboardPro(camera, texture, source, position, Vector3{0.0f, 1.0f, 0.0f},
+                   size, origin, 0.0f, WHITE);
+}
+
+Texture2D& GameManager::getOrCreateStatusTexture(const std::string& stateText,
+                                                 float fontSize, int padding) {
+  auto it = npcStatusTextures.find(stateText);
+  if (it != npcStatusTextures.end()) {
+    return it->second;
+  }
+
+  const Font& font = GetFontDefault();
+  Vector2 measured = MeasureTextEx(font, stateText.c_str(), fontSize, 1);
+
+  int width = static_cast<int>(measured.x * 1.1f) + padding * 2;
+  int height = static_cast<int>(measured.y * 1.1f) + padding * 2;
+
+  Image image = GenImageColor(width, height, BLANK);
+  Color bgColor = {0, 0, 0, 160};
+  ImageDrawRectangle(&image, 0, 0, width, height, bgColor);
+
+  Vector2 textPos = {static_cast<float>(padding), static_cast<float>(padding)};
+  ImageDrawTextEx(&image, font, stateText.c_str(), textPos, fontSize, 1, WHITE);
+
+  Texture2D texture = LoadTextureFromImage(image);
+  UnloadImage(image);
+
+  auto inserted = npcStatusTextures.emplace(stateText, texture);
+  return inserted.first->second;
 }
 
 int GameManager::getRemainingFruits() const {
