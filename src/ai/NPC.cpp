@@ -378,19 +378,6 @@ Vector3 NPC::getRandomPositionInShop() const {
   return targetShop->getRandomInteriorPosition();
 }
 
-bool NPC::isInsideShop() const {
-  if (!targetShop) {
-    return false;
-  }
-
-  return targetShop->isInsideShop(getPosition());
-}
-
-void NPC::interact() {
-  // NPCs can be interacted with to show their state or inventory
-  // For now, this is a placeholder
-}
-
 void NPC::sayMessage(const std::string& context) const {
   if (!chatSystem || !chatSystem->canSpeak()) {
     return;

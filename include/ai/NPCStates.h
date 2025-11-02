@@ -32,33 +32,6 @@ class IdleState : public NPCState {
   const float maxIdleTime = 2.0f;  // Increased from 0.5f to 2.0f
 };
 
-class MovingToShopState : public NPCState {
- public:
-  void enter(NPC* npc) override;
-  void update(NPC* npc, float deltaTime) override;
-  void exit(NPC* npc) override;
-  std::string getName() override { return "MovingToShop"; }
-
- private:
-  enum class WaypointStage {
-    SIDE_APPROACH,
-    FINAL_APPROACH,
-  };
-
-  Vector3 targetPosition;
-  bool hasTarget = false;
-
-  // Pathfinding waypoints
-  Vector3 intermediateTarget;
-  bool hasIntermediateTarget = false;
-  WaypointStage currentStage = WaypointStage::SIDE_APPROACH;
-
-  // Stuck detection
-  Vector3 lastPosition = {0, 0, 0};
-  float stuckTimer = 0.0f;
-  bool hasUsedAlternateApproach = false;
-};
-
 class ShoppingState : public NPCState {
  public:
   void enter(NPC* npc) override;
@@ -67,8 +40,8 @@ class ShoppingState : public NPCState {
   std::string getName() override { return "Shopping"; }
 
  private:
-  float shoppingTime = 0.0f;
-  float maxShoppingTime = 8.0f;
+  float shoppingTime = 10.0f;
+  float maxShoppingTime = 20.0f;
   float fruitSearchTimer = 0.0f;
   float shelfLookingTimer = 0.0f;
   float chatTimer = 0.0f;

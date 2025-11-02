@@ -32,7 +32,6 @@ class Shop {
   const std::vector<std::shared_ptr<Wall>>& getWalls() const { return walls; }
 
   // Position checking
-  bool isInsideShop(Vector3 position) const;
   Vector3 getRandomInteriorPosition() const;
 
   // Shop management

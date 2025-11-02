@@ -73,24 +73,11 @@ void Shop::stockShelves() {
   }
 }
 
-bool Shop::isInsideShop(Vector3 position) const {
-  float wallThickness = 0.3f;
-  float interiorMargin = wallThickness + 0.1f;
-
-  return (position.x >= position.x - size.x / 2.0f + interiorMargin &&
-          position.x <= position.x + size.x / 2.0f - interiorMargin &&
-          position.z >= position.z - size.z / 2.0f + interiorMargin &&
-          position.z <= position.z + size.z / 2.0f - interiorMargin &&
-          position.y >= position.y - size.y / 2.0f &&
-          position.y <= position.y + size.y / 2.0f);
-}
-
 Vector3 Shop::getRandomInteriorPosition() const {
   static std::random_device rd;
   static std::mt19937 gen(rd());
 
-  // Create smaller safe margin to allow NPCs closer to shelves
-  float safeMargin = 1.0f;  // Reduced from 2.0f to get closer to shelves
+  float safeMargin = 1.0f;
 
   std::uniform_real_distribution<float> xDist(
       position.x - size.x / 2.0f + safeMargin,

@@ -220,8 +220,6 @@ void HumanoidCharacter::update(float deltaTime) {
 
   // Synchronize physics bodies with visual positions for collision detection
   synchronizeVisualWithPhysics();
-
-  // Facial features are now updated inside updateVisualPositions()
 }
 
 void HumanoidCharacter::updateCharacterState() {

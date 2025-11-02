@@ -67,7 +67,6 @@ class NPC : public HumanoidCharacter {
   bool isNearTarget(Vector3 target, float threshold = 1.0f) const;
 
   // Shop interaction
-  void setTargetShop(std::shared_ptr<Shop> shop) { targetShop = shop; }
   std::shared_ptr<Shop> getTargetShop() const { return targetShop; }
 
   // Pathfinding
@@ -90,19 +89,11 @@ class NPC : public HumanoidCharacter {
   // Utility methods
   std::shared_ptr<Fruit> findNearestFruit() const;
   Vector3 getRandomPositionInShop() const;
-  Vector3 getExitPosition() const;
-  bool isInsideShop() const;
 
-  float getMovementSpeed() const { return movementSpeed; }
-  float getDetectionRadius() const { return detectionRadius; }
-  float getInteractionRadius() const { return interactionRadius; }
   bool getIsActive() const { return isActive; }
 
   void setActive(bool active) { isActive = active; }
-  void setMovementSpeed(float speed) { movementSpeed = speed; }
   void setChatSystem(NPCChatSystem* chat) { chatSystem = chat; }
-
-  void interact() override;
 
   // Object identification for pathfinding
   std::string getObstacleType() const override { return "npc"; }

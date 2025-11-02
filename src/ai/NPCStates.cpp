@@ -17,69 +17,11 @@ void IdleState::update(NPC* npc, float deltaTime) {
   idleTime += deltaTime;
 
   if (idleTime >= maxIdleTime) {
-    npc->changeState(std::make_unique<MovingToShopState>());
+    npc->changeState(std::make_unique<ShoppingState>());
   }
 }
 
 void IdleState::exit(NPC* npc) {}
-
-void MovingToShopState::enter(NPC* npc) {
-  auto shop = npc->getTargetShop();
-  if (!shop) {
-    return;
-  }
-
-  npc->sayMessage("greeting");
-
-  Vector3 currentPos = npc->getPosition();
-
-  npc->setDestination(shop->getRandomInteriorPosition());
-  hasTarget = true;
-  targetPosition = shop->getRandomInteriorPosition();
-
-  hasIntermediateTarget = false;
-  currentStage = WaypointStage::SIDE_APPROACH;
-
-  lastPosition = currentPos;
-  stuckTimer = 0.0f;
-  hasUsedAlternateApproach = false;
-}
-
-void MovingToShopState::update(NPC* npc, float deltaTime) {
-  auto shop = npc->getTargetShop();
-  if (!shop || !hasTarget) {
-    npc->changeState(std::make_unique<WanderingState>());
-    return;
-  }
-
-  Vector3 currentPos = npc->getPosition();
-  Vector3 targetPos = npc->getCurrentDestination();
-
-  float distanceToTarget = Vector3Distance(currentPos, targetPos);
-
-  if (distanceToTarget < 5.0f) {
-    npc->changeState(std::make_unique<ShoppingState>());
-    return;
-  }
-
-  npc->moveTowards(targetPos, deltaTime);
-
-  float moveDistance = Vector3Distance(currentPos, lastPosition);
-  if (moveDistance < 0.02f) {
-    stuckTimer += deltaTime;
-
-    if (stuckTimer > 5.0f) {
-      npc->changeState(std::make_unique<WanderingState>());
-      return;
-    }
-  } else {
-    stuckTimer = 0.0f;
-  }
-
-  lastPosition = currentPos;
-}
-
-void MovingToShopState::exit(NPC* npc) {}
 
 void ShoppingState::enter(NPC* npc) {
   shoppingTime = 0.0f;
@@ -92,24 +34,6 @@ void ShoppingState::enter(NPC* npc) {
   shelvesVisited = 0;
   currentShelf = nullptr;
   visitedShelves.clear();
-
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_real_distribution<float> timeDist(20.0f, 35.0f);
-  maxShoppingTime = timeDist(gen);
-
-  std::uniform_int_distribution<int> shelfDist(2, 4);
-  minShelvesToVisit = shelfDist(gen);
-
-  auto shop = npc->getTargetShop();
-  if (shop) {
-    Vector3 interiorPosition = shop->getRandomInteriorPosition();
-    npc->setDestination(interiorPosition);
-    currentTarget = interiorPosition;
-    hasCurrentTarget = true;
-  }
-
-  npc->sayMessage("shopping");
 }
 
 void ShoppingState::update(NPC* npc, float deltaTime) {
@@ -117,8 +41,8 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
   fruitSearchTimer += deltaTime;
   chatTimer += deltaTime;
 
-  auto shop = npc->getTargetShop();
-  if (!shop) {
+  auto shelves = npc->getTargetShop()->getShelves();
+  if (shelves.empty()) {
     npc->changeState(std::make_unique<WanderingState>());
     return;
   }
@@ -201,7 +125,6 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
   if (fruitSearchTimer >= 2.0f || !hasCurrentTarget) {
     if (!isLookingAtShelf) {
       // Find an UNVISITED shelf to examine
-      auto shelves = shop->getShelves();
       std::shared_ptr<class Shelf> targetShelf = nullptr;
       float bestDistance = 1000.0f;
 
@@ -265,7 +188,7 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
         }
       } else if (!hasCurrentTarget) {
         // No shelf nearby, move to a new random location in shop
-        Vector3 newInteriorPosition = shop->getRandomInteriorPosition();
+        Vector3 newInteriorPosition = npc->getRandomPositionInShop();
 
         // Only set destination if it's significantly different from last
         // position
@@ -323,7 +246,7 @@ void WanderingState::update(NPC* npc, float deltaTime) {
 
   float distanceToTarget = Vector3Distance(currentPos, targetPos);
   if (distanceToTarget < 8.0f) {
-    npc->changeState(std::make_unique<MovingToShopState>());
+    npc->changeState(std::make_unique<ShoppingState>());
     return;
   }
 
@@ -355,7 +278,7 @@ void WanderingState::update(NPC* npc, float deltaTime) {
   }
 
   if (wanderTime > 8.0f) {
-    npc->changeState(std::make_unique<MovingToShopState>());
+    npc->changeState(std::make_unique<ShoppingState>());
   }
 }
 
@@ -370,11 +293,7 @@ void LeavingState::enter(NPC* npc) {
 
   // First, try to exit the shop by going to a random interior position
   Vector3 currentPos = npc->getPosition();
-  if (npc->getTargetShop() && npc->getTargetShop()->isInsideShop(currentPos)) {
-    exitTarget = npc->getTargetShop()->getRandomInteriorPosition();
-  } else {
-    exitTarget = {0.0f, currentPos.y, 0.0f};
-  }
+  exitTarget = npc->getTargetShop()->getRandomInteriorPosition();
 
   hasExitTarget = true;
   npc->setDestination(exitTarget);
@@ -448,10 +367,6 @@ void LeavingState::update(NPC* npc, float deltaTime) {
   }
 
   if (distanceToExit < 2.0f) {
-    if (npc->getTargetShop() &&
-        npc->getTargetShop()->isInsideShop(currentPos)) {
-    }
-
     Vector3 shopCenter = {0.0f, currentPos.y, -10.0f};
     float distanceFromShop = Vector3Distance(currentPos, shopCenter);
 
