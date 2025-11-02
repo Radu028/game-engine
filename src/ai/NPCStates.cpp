@@ -35,6 +35,8 @@ void ShoppingState::enter(NPC* npc) {
 }
 
 void ShoppingState::update(NPC* npc, float deltaTime) {
+  constexpr float LOOKING_AT_SHELF_TIME = 10.0f;
+
   shoppingTime += deltaTime;
   fruitSearchTimer += deltaTime;
   chatTimer += deltaTime;
@@ -48,7 +50,7 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
   handleChatting(npc);
 
   if (isLookingAtShelf) {
-    handleShelfLooking(npc, deltaTime);
+    handleShelfLooking(npc, deltaTime, LOOKING_AT_SHELF_TIME);
     return;
   }
 
@@ -78,10 +80,18 @@ void ShoppingState::handleChatting(NPC* npc) {
   chatTimer = 0.0f;
 }
 
-void ShoppingState::handleShelfLooking(NPC* npc, float deltaTime) {
+void ShoppingState::handleShelfLooking(NPC* npc, float deltaTime,
+                                       float lookingAtShelfTime) {
   shelfLookingTimer += deltaTime;
 
-  if (shelfLookingTimer < 3.0f) return;
+  if (currentShelf && currentShelf->isEmpty()) {
+    isLookingAtShelf = false;
+    shelfLookingTimer = 0.0f;
+    currentShelf = nullptr;
+    return;
+  }
+
+  if (shelfLookingTimer < lookingAtShelfTime) return;
 
   if (shouldPurchaseFruit()) {
     attemptFruitPurchase(npc);

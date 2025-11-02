@@ -41,7 +41,7 @@ class ShoppingState : public NPCState {
 
  private:
   void handleChatting(NPC* npc);
-  void handleShelfLooking(NPC* npc, float deltaTime);
+  void handleShelfLooking(NPC* npc, float deltaTime, float lookingAtShelfTime);
   void handleMovement(NPC* npc, float deltaTime);
   void handleShelfSearch(NPC* npc);
   bool shouldPurchaseFruit() const;
