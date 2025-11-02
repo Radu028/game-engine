@@ -164,19 +164,15 @@ std::shared_ptr<Shelf> ShoppingState::findTargetShelf(
 void ShoppingState::moveToShelf(NPC* npc, std::shared_ptr<Shelf> shelf) {
   Vector3 npcPos = npc->getPosition();
   Vector3 shelfPos = shelf->getPosition();
-  Vector3 examinePos = {shelfPos.x, npcPos.y, shelfPos.z + 2.0f};
 
-  // Only set destination if it's significantly different
-  if (Vector3Distance(examinePos, currentTarget) > 2.0f) {
-    currentTarget = examinePos;
-    npc->setDestination(currentTarget);
-  }
+  currentTarget = shelfPos;
+  currentShelf = shelf;
+  npc->setDestination(currentTarget);
 
   // If very close to shelf, start looking
-  if (Vector3Distance(examinePos, npcPos) < 2.5f) {
+  if (Vector3Distance(npcPos, shelfPos) < 2.5f) {
     isLookingAtShelf = true;
-    shelfLookingTimer = 0.0f;
-    currentShelf = shelf;
+    shelfLookingTimer = 10.0f;
   }
 }
 
