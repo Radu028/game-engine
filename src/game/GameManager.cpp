@@ -71,10 +71,6 @@ void GameManager::render(Camera3D camera) {
   if (GameWorld* world = GameWorld::getInstance()) {
     if (auto navMesh = world->getNavMesh()) {
       navMesh->debugDraw();
-      if (shop) {
-        navMesh->debugDrawEntranceNodes(shop->getEntrancePosition(),
-                                        shop->getEntranceSize());
-      }
     }
   }
 
@@ -192,11 +188,6 @@ void GameManager::initializeShop() {
   // Create shop at the center of the world
   Vector3 shopPosition = {0.0f, 2.0f, -10.0f};
   shop = std::make_shared<Shop>(shopPosition);
-
-  // Add shop to game world
-  if (GameWorld* world = GameWorld::getInstance(nullptr)) {
-    world->addObject(shop);
-  }
 
   // Count initial fruits
   totalFruitsInStock = shop->getTotalFruitCount();

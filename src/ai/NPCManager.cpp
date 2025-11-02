@@ -142,14 +142,10 @@ void NPCManager::setSpawnInterval(float min, float max) {
 }
 
 Vector3 NPCManager::getRandomSpawnPosition() const {
-  Vector3 shopPos = shop ? shop->getPosition() : Vector3{0, 0, 0};
-  Vector3 entrancePos = shop ? shop->getEntrancePosition() : Vector3{0, 0, 0};
-
   std::uniform_real_distribution<float> xOffset(-3.0f, 8.0f);
   std::uniform_real_distribution<float> zOffset(6.0f, 12.0f);
 
-  Vector3 spawnPos = {entrancePos.x + xOffset(gen), 0.5f,
-                      entrancePos.z + zOffset(gen)};
+  Vector3 spawnPos = {xOffset(gen), 0.5f, zOffset(gen)};
 
   return spawnPos;
 }

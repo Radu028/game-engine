@@ -78,9 +78,6 @@ class NavMesh {
                        float expansionFactor = 0.5f);
   bool isPositionBlocked(Vector3 position) const;
 
-  void defineShopEntrance(Vector3 entrancePos, Vector3 entranceSize);
-  void defineShopInterior(Vector3 shopPos, Vector3 shopSize);
-
   // Pathfinding
   std::vector<Vector3> findPath(Vector3 start, Vector3 end);
   std::vector<Vector3> findAlternativePath(Vector3 start, Vector3 end,
@@ -101,10 +98,6 @@ class NavMesh {
   int countNearbyObstacles(Vector3 position) const;
   void connectNodes();
   bool hasLineOfSight(Vector3 from, Vector3 to) const;
-  bool isNodeFullyAccessible(Vector3 nodePos, Vector3 entrancePos,
-                             Vector3 entranceSize) const;
-  bool isNodeTooCloseToWall(Vector3 nodePos, Vector3 entrancePos,
-                            Vector3 entranceSize) const;
 
   // Configuration
   void setNPCHeight(float height) { npcHeight = height; }
@@ -114,7 +107,6 @@ class NavMesh {
 
   // Debug
   void debugDraw() const;
-  void debugDrawEntranceNodes(Vector3 entrancePos, Vector3 entranceSize) const;
   void debugDrawRegisteredObjects() const;
   const std::vector<NavNode>& getNodes() const { return nodes; }
   size_t getRegisteredObjectCount() const { return registeredObjects.size(); }

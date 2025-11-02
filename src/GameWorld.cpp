@@ -130,20 +130,6 @@ void GameWorld::initializeNavMesh() {
     }
   }
 
-  auto shops = findObjectsOfType<Shop>();
-  for (const auto& shop : shops) {
-    Vector3 shopPos = shop->getPosition();
-    Vector3 shopSize = shop->getSize();
-
-    // Define shop interior as walkable (overrides obstacle for interior)
-    navigationMesh->defineShopInterior(shopPos, shopSize);
-
-    // Define shop entrance area as walkable
-    Vector3 entrancePos = shop->getEntrancePosition();
-    Vector3 entranceSize = {3.0f, 2.0f, 3.0f};  // Generous entrance area
-    navigationMesh->defineShopEntrance(entrancePos, entranceSize);
-  }
-
   // Build connections ONCE at the end after all static obstacles are set
   navigationMesh->rebuildConnections();
 

@@ -5,80 +5,58 @@
 #include "GameWorld.h"
 #include "raymath.h"
 
-Shop::Shop(Vector3 position, Vector3 size)
-    : CubeObject(position, size, BEIGE, false, "", false, false, false),
-      entranceSize({4.0f, 3.0f, 1.0f}) {
-  entrancePosition = {position.x, position.y - size.y / 2.0f + 0.5f,
-                      position.z + size.z / 2.0f - 0.5f};
-
-  interiorBounds = calculateInteriorBounds();
-
+Shop::Shop(Vector3 position, Vector3 size) : position(position), size(size) {
   buildWalls();
   createShelves();
   stockShelves();
 }
 
 void Shop::buildWalls() {
-  Vector3 shopPos = getPosition();
-  Vector3 shopSize = getSize();
-
   float wallThickness = 0.3f;
-  float wallHeight = shopSize.y;
+  float wallHeight = size.y;
 
-  float entranceWidth = entranceSize.x;
-  float frontWallWidth = (shopSize.x - entranceWidth) / 2.0f;
-
-  // Front wall (left side of entrance)
-  addWall({shopPos.x - shopSize.x / 2.0f + frontWallWidth / 2.0f, shopPos.y,
-           shopPos.z + shopSize.z / 2.0f},
-          {frontWallWidth, wallHeight, wallThickness});
-
-  // Front wall (right side of entrance)
-  addWall({shopPos.x + shopSize.x / 2.0f - frontWallWidth / 2.0f, shopPos.y,
-           shopPos.z + shopSize.z / 2.0f},
-          {frontWallWidth, wallHeight, wallThickness});
+  // Front wall
+  addWall({position.x, position.y, position.z + size.z / 2.0f},
+          {size.x, wallHeight, wallThickness});
 
   // Back wall
-  addWall({shopPos.x, shopPos.y, shopPos.z - shopSize.z / 2.0f},
-          {shopSize.x, wallHeight, wallThickness});
+  addWall({position.x, position.y, position.z - size.z / 2.0f},
+          {size.x, wallHeight, wallThickness});
 
   // Left wall
-  addWall({shopPos.x - shopSize.x / 2.0f, shopPos.y, shopPos.z},
-          {wallThickness, wallHeight, shopSize.z});
+  addWall({position.x - size.x / 2.0f, position.y, position.z},
+          {wallThickness, wallHeight, size.z});
 
   // Right wall
-  addWall({shopPos.x + shopSize.x / 2.0f, shopPos.y, shopPos.z},
-          {wallThickness, wallHeight, shopSize.z});
+  addWall({position.x + size.x / 2.0f, position.y, position.z},
+          {wallThickness, wallHeight, size.z});
 
-  addWall({shopPos.x, shopPos.y + shopSize.y / 2.0f, shopPos.z},
-          {shopSize.x, wallThickness, shopSize.z});
+  addWall({position.x, position.y + size.y / 2.0f, position.z},
+          {size.x, wallThickness, size.z});
 }
 
 void Shop::createShelves() {
-  Vector3 shopPos = getPosition();
-  Vector3 shopSize = getSize();
-
   float shelfHeight = 1.0f;
   float navigationMargin = 1.5f;
 
   for (int i = 0; i < 2; ++i) {
-    Vector3 shelfPos = {shopPos.x - shopSize.x / 2.0f + navigationMargin,
-                        shopPos.y - shopSize.y / 2.0f + shelfHeight,
-                        shopPos.z - shopSize.z / 4.0f + i * shopSize.z / 2.0f};
+    Vector3 shelfPos = {position.x - size.x / 2.0f + navigationMargin,
+                        position.y - size.y / 2.0f + shelfHeight,
+                        position.z - size.z / 4.0f + i * size.z / 2.0f};
     auto shelf = std::make_shared<Shelf>(shelfPos);
     shelves.push_back(shelf);
   }
 
   for (int i = 0; i < 2; ++i) {
-    Vector3 shelfPos = {shopPos.x + shopSize.x / 2.0f - navigationMargin,
-                        shopPos.y - shopSize.y / 2.0f + shelfHeight,
-                        shopPos.z - shopSize.z / 4.0f + i * shopSize.z / 2.0f};
+    Vector3 shelfPos = {position.x + size.x / 2.0f - navigationMargin,
+                        position.y - size.y / 2.0f + shelfHeight,
+                        position.z - size.z / 4.0f + i * size.z / 2.0f};
     auto shelf = std::make_shared<Shelf>(shelfPos);
     shelves.push_back(shelf);
   }
 
   Vector3 centerShelfPos = {
-      shopPos.x, shopPos.y - shopSize.y / 2.0f + shelfHeight, shopPos.z};
+      position.x, position.y - size.y / 2.0f + shelfHeight, position.z};
   auto centerShelf = std::make_shared<Shelf>(centerShelfPos);
   shelves.push_back(centerShelf);
 
@@ -96,54 +74,32 @@ void Shop::stockShelves() {
 }
 
 bool Shop::isInsideShop(Vector3 position) const {
-  Vector3 shopPos = getPosition();
-  Vector3 shopSize = getSize();
-
   float wallThickness = 0.3f;
   float interiorMargin = wallThickness + 0.1f;
 
-  return (position.x >= shopPos.x - shopSize.x / 2.0f + interiorMargin &&
-          position.x <= shopPos.x + shopSize.x / 2.0f - interiorMargin &&
-          position.z >= shopPos.z - shopSize.z / 2.0f + interiorMargin &&
-          position.z <= shopPos.z + shopSize.z / 2.0f - interiorMargin &&
-          position.y >= shopPos.y - shopSize.y / 2.0f &&
-          position.y <= shopPos.y + shopSize.y / 2.0f);
-}
-
-bool Shop::isNearEntrance(Vector3 position, float threshold) const {
-  Vector3 entrancePos = getEntrancePosition();
-  float distance = Vector3Distance(position, entrancePos);
-
-  float entranceHalfWidth = entranceSize.x / 2.0f;
-  float entranceDepth = entranceSize.z + 2.0f;
-
-  bool withinEntranceBounds =
-      (position.x >= entrancePos.x - entranceHalfWidth - 1.0f &&
-       position.x <= entrancePos.x + entranceHalfWidth + 1.0f &&
-       position.z >= entrancePos.z - entranceDepth &&
-       position.z <= entrancePos.z + entranceDepth);
-
-  return distance <= threshold || withinEntranceBounds;
+  return (position.x >= position.x - size.x / 2.0f + interiorMargin &&
+          position.x <= position.x + size.x / 2.0f - interiorMargin &&
+          position.z >= position.z - size.z / 2.0f + interiorMargin &&
+          position.z <= position.z + size.z / 2.0f - interiorMargin &&
+          position.y >= position.y - size.y / 2.0f &&
+          position.y <= position.y + size.y / 2.0f);
 }
 
 Vector3 Shop::getRandomInteriorPosition() const {
   static std::random_device rd;
   static std::mt19937 gen(rd());
 
-  Vector3 shopPos = getPosition();
-  Vector3 shopSize = getSize();
-
   // Create smaller safe margin to allow NPCs closer to shelves
   float safeMargin = 1.0f;  // Reduced from 2.0f to get closer to shelves
 
   std::uniform_real_distribution<float> xDist(
-      shopPos.x - shopSize.x / 2.0f + safeMargin,
-      shopPos.x + shopSize.x / 2.0f - safeMargin);
+      position.x - size.x / 2.0f + safeMargin,
+      position.x + size.x / 2.0f - safeMargin);
   std::uniform_real_distribution<float> zDist(
-      shopPos.z - shopSize.z / 2.0f + safeMargin,
-      shopPos.z + shopSize.z / 2.0f - safeMargin);
+      position.z - size.z / 2.0f + safeMargin,
+      position.z + size.z / 2.0f - safeMargin);
 
-  return {xDist(gen), shopPos.y - shopSize.y / 2.0f + 1.0f, zDist(gen)};
+  return {xDist(gen), position.y - size.y / 2.0f + 1.0f, zDist(gen)};
 }
 
 void Shop::restockAllShelves() {
@@ -183,33 +139,21 @@ std::shared_ptr<Fruit> Shop::findNearestFruit(Vector3 position) {
 void Shop::interact() { restockAllShelves(); }
 
 void Shop::update(float deltaTime) {
-  CubeObject::update(deltaTime);
-
   for (auto& shelf : shelves) {
     shelf->update(deltaTime);
   }
 }
 
-std::unique_ptr<GameObject> Shop::clone() const {
-  return std::make_unique<Shop>(*this);
-}
-
 void Shop::addWall(Vector3 position, Vector3 size, Color color) {
-  auto wall = std::make_shared<CubeObject>(position, size, color, true, "",
-                                           false, true, true);
+  auto wall = std::make_shared<Wall>(position, size, color);
   walls.push_back(wall);
-
-  if (GameWorld* world = GameWorld::getInstance(nullptr)) {
-    world->addObjectAsObstacleDeferred(wall);
-  }
 }
 
 Vector3 Shop::calculateInteriorBounds() const {
-  Vector3 shopSize = getSize();
   return {
-      shopSize.x - 2.0f,  // Leave space for walls
-      shopSize.y - 1.0f,  // Leave space for floor/ceiling
-      shopSize.z - 2.0f   // Leave space for walls
+      size.x - 2.0f,  // Leave space for walls
+      size.y - 1.0f,  // Leave space for floor/ceiling
+      size.z - 2.0f   // Leave space for walls
   };
 }
 

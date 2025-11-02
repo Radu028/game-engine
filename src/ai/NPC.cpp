@@ -112,15 +112,8 @@ void NPC::moveTowards(Vector3 target, float deltaTime) {
     direction = Vector3Normalize(direction);
 
     bool isCloseToTarget = distanceToTarget < 4.0f;
-    bool isApproachingShopEntrance = false;
 
-    if (targetShop) {
-      Vector3 entrancePos = targetShop->getEntrancePosition();
-      float distanceToEntrance = Vector3Distance(currentPos, entrancePos);
-      isApproachingShopEntrance = distanceToEntrance < 6.0f;
-    }
-
-    if (!isCloseToTarget && !isApproachingShopEntrance &&
+    if (!isCloseToTarget &&
         wouldCollideAfterMovement(direction, deltaTime * 2.0f)) {
       float angle45 = PI / 4.0f;
       Vector3 leftDirection = {
@@ -383,15 +376,6 @@ Vector3 NPC::getRandomPositionInShop() const {
   }
 
   return targetShop->getRandomInteriorPosition();
-}
-
-Vector3 NPC::getExitPosition() const {
-  if (!targetShop) {
-    return {20.0f, 0.5f, 20.0f};
-  }
-
-  Vector3 entrance = targetShop->getEntrancePosition();
-  return {entrance.x, entrance.y, entrance.z + 5.0f};
 }
 
 bool NPC::isInsideShop() const {

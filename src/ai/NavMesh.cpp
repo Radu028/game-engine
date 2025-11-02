@@ -102,66 +102,13 @@ void NavMesh::addObstacle(Vector3 position, Vector3 size,
   if (type == "shelf") {
     expansionFactor = 0.7f;
   } else if (type == "wall") {
-    expansionFactor = 0.3f;
+    expansionFactor = 0.0f;
   }
 
   markNodesInArea(position, size, false, expansionFactor);
 
   // Don't rebuild connections here - do it once at the end in
   // initializeNavMesh()
-}
-
-void NavMesh::defineShopEntrance(Vector3 entrancePos, Vector3 entranceSize) {
-  float entranceHalfWidth = entranceSize.x / 2.0f;
-  float entranceDepth = entranceSize.z * 2.0f;
-
-  float frontWallWidth = (20.0f - entranceSize.x) / 2.0f;
-  float leftWallMaxX = entrancePos.x - entranceHalfWidth;
-  float rightWallMinX = entrancePos.x + entranceHalfWidth;
-
-  int safeNodesCount = 0;
-  int edgeNodesCount = 0;
-  int rejectedNodesCount = 0;
-
-  for (auto& node : nodes) {
-    Vector3 diff = Vector3Subtract(node.position, entrancePos);
-
-    if (std::abs(diff.z) <= entranceDepth) {
-      float safeMargin = nodeSpacing * 0.4f;
-
-      if (diff.x >= (leftWallMaxX + safeMargin) &&
-          diff.x <= (rightWallMinX - safeMargin)) {
-        node.walkable = true;
-        safeNodesCount++;
-      } else if (std::abs(diff.x) <= entranceHalfWidth + safeMargin) {
-        // Node is near entrance edge - do additional verification
-        if (isNodeFullyAccessible(node.position, entrancePos, entranceSize) &&
-            !isNodeTooCloseToWall(node.position, entrancePos, entranceSize)) {
-          node.walkable = true;
-          edgeNodesCount++;
-        } else {
-          rejectedNodesCount++;
-        }
-      }
-    }
-  }
-}
-
-void NavMesh::defineShopInterior(Vector3 shopPos, Vector3 shopSize) {
-  // Mark interior of shop as walkable, but leave a small margin for walls
-  float wallThickness = 1.0f;
-  Vector3 interiorSize = {shopSize.x - wallThickness * 2.0f, shopSize.y,
-                          shopSize.z - wallThickness * 2.0f};
-
-  int interiorNodesCount = 0;
-  for (auto& node : nodes) {
-    Vector3 diff = Vector3Subtract(node.position, shopPos);
-    if (std::abs(diff.x) <= interiorSize.x / 2.0f &&
-        std::abs(diff.z) <= interiorSize.z / 2.0f) {
-      node.walkable = true;
-      interiorNodesCount++;
-    }
-  }
 }
 
 std::vector<Vector3> NavMesh::findPath(Vector3 start, Vector3 end) {
@@ -455,43 +402,6 @@ void NavMesh::debugDraw() const {
   }
 }
 
-void NavMesh::debugDrawEntranceNodes(Vector3 entrancePos,
-                                     Vector3 entranceSize) const {
-  float entranceHalfWidth = entranceSize.x / 2.0f;
-  float entranceDepth = entranceSize.z * 2.0f;
-
-  Vector3 entranceMin = {entrancePos.x - entranceHalfWidth, entrancePos.y,
-                         entrancePos.z - entranceDepth};
-  Vector3 entranceMax = {entrancePos.x + entranceHalfWidth, entrancePos.y,
-                         entrancePos.z + entranceDepth};
-
-  DrawCubeWires({entrancePos.x, entrancePos.y + 0.1f, entrancePos.z},
-                entranceSize.x, 0.2f, entranceDepth, YELLOW);
-
-  // Draw nodes in entrance area with different colors based on walkability
-  for (const auto& node : nodes) {
-    Vector3 diff = Vector3Subtract(node.position, entrancePos);
-
-    // Check if node is in entrance area
-    if (std::abs(diff.x) <= entranceHalfWidth + 1.0f &&
-        std::abs(diff.z) <= entranceDepth) {
-      Color nodeColor;
-      if (node.walkable) {
-        if (std::abs(diff.x) <= entranceHalfWidth - nodeSpacing * 0.4f) {
-          nodeColor = GREEN;  // Safely inside entrance
-        } else {
-          nodeColor = ORANGE;  // Edge node marked as walkable
-        }
-      } else {
-        nodeColor = RED;  // Not walkable
-      }
-
-      DrawSphere({node.position.x, node.position.y + 0.3f, node.position.z},
-                 0.15f, nodeColor);
-    }
-  }
-}
-
 std::vector<Vector3> NavMesh::findAlternativePath(Vector3 start, Vector3 end,
                                                   Vector3 blockedArea) {
   int startNode = findNearestNode(start);
@@ -619,84 +529,6 @@ void NavMesh::rebuildConnections() {
 
   // Rebuild connections with proper line of sight checking
   connectNodes();
-}
-
-bool NavMesh::isNodeFullyAccessible(Vector3 nodePos, Vector3 entrancePos,
-                                    Vector3 entranceSize) const {
-  // Check if the node has enough clearance around it to be considered fully
-  // accessible
-  float clearanceRadius =
-      nodeSpacing * 0.6f;  // Require 60% of node spacing as clearance
-
-  // Sample points around the node to verify accessibility
-  std::vector<Vector3> testPoints = {
-      {nodePos.x - clearanceRadius, nodePos.y, nodePos.z},
-      {nodePos.x + clearanceRadius, nodePos.y, nodePos.z},
-      {nodePos.x, nodePos.y, nodePos.z - clearanceRadius},
-      {nodePos.x, nodePos.y, nodePos.z + clearanceRadius},
-      {nodePos.x - clearanceRadius * 0.7f, nodePos.y,
-       nodePos.z - clearanceRadius * 0.7f},
-      {nodePos.x + clearanceRadius * 0.7f, nodePos.y,
-       nodePos.z - clearanceRadius * 0.7f},
-      {nodePos.x - clearanceRadius * 0.7f, nodePos.y,
-       nodePos.z + clearanceRadius * 0.7f},
-      {nodePos.x + clearanceRadius * 0.7f, nodePos.y,
-       nodePos.z + clearanceRadius * 0.7f}};
-
-  // Calculate entrance boundaries
-  float entranceHalfWidth = entranceSize.x / 2.0f;
-  float leftBoundary = entrancePos.x - entranceHalfWidth;
-  float rightBoundary = entrancePos.x + entranceHalfWidth;
-  float frontBoundary = entrancePos.z + entranceSize.z / 2.0f;
-  float backBoundary = entrancePos.z - entranceSize.z / 2.0f;
-
-  // Check if all test points are within safe entrance bounds
-  int validPoints = 0;
-  for (const Vector3& testPoint : testPoints) {
-    // Check if test point is within entrance corridor
-    if (testPoint.x >= leftBoundary && testPoint.x <= rightBoundary &&
-        testPoint.z >= backBoundary && testPoint.z <= frontBoundary + 2.0f) {
-      validPoints++;
-    }
-  }
-
-  // Node is fully accessible if at least 75% of test points are valid
-  return validPoints >= static_cast<int>(testPoints.size() * 0.75f);
-}
-
-bool NavMesh::isNodeTooCloseToWall(Vector3 nodePos, Vector3 entrancePos,
-                                   Vector3 entranceSize) const {
-  // Check if node is too close to the front walls adjacent to the entrance
-  float entranceHalfWidth = entranceSize.x / 2.0f;
-  float wallThickness = 0.3f;                    // From Shop::buildWalls
-  float minDistanceToWall = nodeSpacing * 0.5f;  // Minimum safe distance
-
-  // Calculate wall boundaries
-  float leftWallCenterX = entrancePos.x - entranceHalfWidth;
-  float rightWallCenterX = entrancePos.x + entranceHalfWidth;
-  float frontWallZ = entrancePos.z + entranceSize.z / 2.0f;
-
-  // Check distance to left front wall edge
-  if (nodePos.x <= leftWallCenterX + wallThickness / 2.0f &&
-      nodePos.z <= frontWallZ + 1.0f) {
-    float distToLeftWall =
-        std::abs(nodePos.x - (leftWallCenterX + wallThickness / 2.0f));
-    if (distToLeftWall < minDistanceToWall) {
-      return true;
-    }
-  }
-
-  // Check distance to right front wall edge
-  if (nodePos.x >= rightWallCenterX - wallThickness / 2.0f &&
-      nodePos.z <= frontWallZ + 1.0f) {
-    float distToRightWall =
-        std::abs(nodePos.x - (rightWallCenterX - wallThickness / 2.0f));
-    if (distToRightWall < minDistanceToWall) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 void NavMesh::markNodesInArea(Vector3 center, Vector3 size, bool walkable,

@@ -43,7 +43,6 @@ class MovingToShopState : public NPCState {
   enum class WaypointStage {
     SIDE_APPROACH,
     FINAL_APPROACH,
-    DIRECT_TO_ENTRANCE
   };
 
   Vector3 targetPosition;

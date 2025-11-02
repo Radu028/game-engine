@@ -3,22 +3,22 @@
 #include <memory>
 #include <vector>
 
-#include "objects/CubeObject.h"
+#include "objects/Wall.h"
 #include "raylib.h"
 #include "shop/Shelf.h"
 
-// Shop building with walls, entrance, and interior shelves
-class Shop : public CubeObject {
+// Shop building with walls and shelves
+class Shop {
  private:
-  std::vector<std::shared_ptr<CubeObject>> walls;
+  Vector3 position;
+  Vector3 size;
+
+  std::vector<std::shared_ptr<Wall>> walls;
   std::vector<std::shared_ptr<Shelf>> shelves;
-  Vector3 entrancePosition;
-  Vector3 entranceSize;
-  Vector3 interiorBounds;
 
  public:
   Shop(Vector3 position, Vector3 size = {12.0f, 4.0f, 8.0f});
-  ~Shop() override = default;
+  ~Shop() = default;
 
   // Shop setup
   void buildWalls();
@@ -29,15 +29,10 @@ class Shop : public CubeObject {
   const std::vector<std::shared_ptr<Shelf>>& getShelves() const {
     return shelves;
   }
-  const std::vector<std::shared_ptr<CubeObject>>& getWalls() const {
-    return walls;
-  }
+  const std::vector<std::shared_ptr<Wall>>& getWalls() const { return walls; }
 
   // Position checking
   bool isInsideShop(Vector3 position) const;
-  bool isNearEntrance(Vector3 position, float threshold = 1.0f) const;
-  Vector3 getEntrancePosition() const { return entrancePosition; }
-  Vector3 getEntranceSize() const { return entranceSize; }
   Vector3 getRandomInteriorPosition() const;
 
   // Shop management
@@ -46,9 +41,9 @@ class Shop : public CubeObject {
   bool isEmpty() const;
   std::shared_ptr<Fruit> findNearestFruit(Vector3 position);
 
-  void interact() override;
-  void update(float deltaTime) override;
-  std::unique_ptr<GameObject> clone() const override;
+  void interact();
+  void update(float deltaTime);
+  std::unique_ptr<GameObject> clone() const;
 
  private:
   void addWall(Vector3 position, Vector3 size, Color color = DARKBROWN);

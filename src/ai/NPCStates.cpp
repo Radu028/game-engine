@@ -32,14 +32,13 @@ void MovingToShopState::enter(NPC* npc) {
   npc->sayMessage("greeting");
 
   Vector3 currentPos = npc->getPosition();
-  Vector3 entrancePos = shop->getEntrancePosition();
 
-  npc->setDestination(entrancePos);
+  npc->setDestination(shop->getRandomInteriorPosition());
   hasTarget = true;
-  targetPosition = entrancePos;
+  targetPosition = shop->getRandomInteriorPosition();
 
   hasIntermediateTarget = false;
-  currentStage = WaypointStage::DIRECT_TO_ENTRANCE;
+  currentStage = WaypointStage::SIDE_APPROACH;
 
   lastPosition = currentPos;
   stuckTimer = 0.0f;
@@ -54,19 +53,16 @@ void MovingToShopState::update(NPC* npc, float deltaTime) {
   }
 
   Vector3 currentPos = npc->getPosition();
-  Vector3 entrancePos = shop->getEntrancePosition();
+  Vector3 targetPos = npc->getCurrentDestination();
 
-  float distanceToEntrance = Vector3Distance(currentPos, entrancePos);
+  float distanceToTarget = Vector3Distance(currentPos, targetPos);
 
-  bool isInsideShop = shop->isInsideShop(currentPos);
-  bool isInEntranceArea = shop->isNearEntrance(currentPos, 5.0f);
-
-  if (distanceToEntrance < 5.0f || isInsideShop || isInEntranceArea) {
+  if (distanceToTarget < 5.0f) {
     npc->changeState(std::make_unique<ShoppingState>());
     return;
   }
 
-  npc->moveTowards(entrancePos, deltaTime);
+  npc->moveTowards(targetPos, deltaTime);
 
   float moveDistance = Vector3Distance(currentPos, lastPosition);
   if (moveDistance < 0.02f) {
@@ -323,10 +319,10 @@ void WanderingState::update(NPC* npc, float deltaTime) {
   }
 
   Vector3 currentPos = npc->getPosition();
-  Vector3 entrancePos = shop->getEntrancePosition();
+  Vector3 targetPos = shop->getRandomInteriorPosition();
 
-  float distanceToEntrance = Vector3Distance(currentPos, entrancePos);
-  if (distanceToEntrance < 8.0f) {
+  float distanceToTarget = Vector3Distance(currentPos, targetPos);
+  if (distanceToTarget < 8.0f) {
     npc->changeState(std::make_unique<MovingToShopState>());
     return;
   }
@@ -335,15 +331,15 @@ void WanderingState::update(NPC* npc, float deltaTime) {
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    Vector3 toEntrance = Vector3Subtract(entrancePos, currentPos);
-    toEntrance = Vector3Normalize(toEntrance);
+    Vector3 toTarget = Vector3Subtract(targetPos, currentPos);
+    toTarget = Vector3Normalize(toTarget);
 
     std::uniform_real_distribution<float> angleDist(-PI / 3, PI / 3);
     float angle = angleDist(gen);
 
     Vector3 wanderDirection = {
-        toEntrance.x * cos(angle) - toEntrance.z * sin(angle), 0,
-        toEntrance.x * sin(angle) + toEntrance.z * cos(angle)};
+        toTarget.x * cos(angle) - toTarget.z * sin(angle), 0,
+        toTarget.x * sin(angle) + toTarget.z * cos(angle)};
     wanderDirection = Vector3Normalize(wanderDirection);
 
     std::uniform_real_distribution<float> distDist(5.0f, 12.0f);
@@ -372,13 +368,12 @@ void LeavingState::enter(NPC* npc) {
   alternativeAttempts = 0;
   lastPosition = npc->getPosition();
 
-  // First, try to exit the shop by going to the entrance
+  // First, try to exit the shop by going to a random interior position
   Vector3 currentPos = npc->getPosition();
   if (npc->getTargetShop() && npc->getTargetShop()->isInsideShop(currentPos)) {
-    exitTarget = npc->getTargetShop()->getEntrancePosition();
+    exitTarget = npc->getTargetShop()->getRandomInteriorPosition();
   } else {
-    exitTarget = {currentPos.x > 0 ? 30.0f : -30.0f, currentPos.y,
-                  currentPos.z > 0 ? 30.0f : -30.0f};
+    exitTarget = {0.0f, currentPos.y, 0.0f};
   }
 
   hasExitTarget = true;
