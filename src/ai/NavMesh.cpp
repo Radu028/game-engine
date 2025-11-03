@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <queue>
 
 #include "objects/GameObject.h"
@@ -14,7 +15,9 @@ NavMesh::NavMesh(Vector3 minBounds, Vector3 maxBounds, float spacing,
       maxBounds(maxBounds),
       nodeSpacing(spacing),
       groundLevel(groundY),
-      npcHeight(GameSettings::Character::HEIGHT) {}
+      npcHeight(GameSettings::Character::HEIGHT),
+      gridWidth(0),
+      gridHeight(0) {}
 
 void NavMesh::setNodeWalkable(int nodeIndex, bool walkable) {
   if (nodeIndex < 0 || nodeIndex >= static_cast<int>(nodes.size())) return;
@@ -42,9 +45,22 @@ void NavMesh::generateNavMesh() {
   blockedNodeLookup.clear();
   blockedNodeCache.clear();
 
-  for (float x = minBounds.x; x <= maxBounds.x; x += nodeSpacing) {
-    for (float z = minBounds.z; z <= maxBounds.z; z += nodeSpacing) {
-      Vector3 nodePos = {x, groundLevel + 0.5f, z};
+  float widthSpan = maxBounds.x - minBounds.x;
+  float heightSpan = maxBounds.z - minBounds.z;
+
+  gridWidth =
+      std::max(1, static_cast<int>(std::lround(widthSpan / nodeSpacing)) + 1);
+  gridHeight =
+      std::max(1, static_cast<int>(std::lround(heightSpan / nodeSpacing)) + 1);
+
+  nodes.reserve(static_cast<size_t>(gridWidth) *
+                static_cast<size_t>(gridHeight));
+
+  for (int z = 0; z < gridHeight; ++z) {
+    float zPos = minBounds.z + static_cast<float>(z) * nodeSpacing;
+    for (int x = 0; x < gridWidth; ++x) {
+      float xPos = minBounds.x + static_cast<float>(x) * nodeSpacing;
+      Vector3 nodePos = {xPos, groundLevel + 0.5f, zPos};
       nodes.emplace_back(nodePos);
     }
   }
@@ -52,71 +68,99 @@ void NavMesh::generateNavMesh() {
   connectNodes();
 }
 
+// void NavMesh::connectNodes() {
+//   // Clear all existing connections first
+//   for (auto& node : nodes) {
+//     node.connections.clear();
+//   }
+
+//   // OPTIMIZED: O(n) grid-based connection instead of O(n²)
+//   // Calculate grid dimensions
+//   int gridWidth =
+//       static_cast<int>((maxBounds.x - minBounds.x) / nodeSpacing) + 1;
+//   int gridHeight =
+//       static_cast<int>((maxBounds.z - minBounds.z) / nodeSpacing) + 1;
+
+//   // Lambda to convert 2D grid coordinates to 1D node index
+//   auto getNodeIndex = [&](int x, int z) -> int {
+//     if (x < 0 || x >= gridWidth || z < 0 || z >= gridHeight) return -1;
+//     return z * gridWidth + x;
+//   };
+
+//   // Lambda to convert node index to grid coordinates
+//   auto getGridCoords = [&](int nodeIndex) -> std::pair<int, int> {
+//     int z = nodeIndex / gridWidth;
+//     int x = nodeIndex % gridWidth;
+//     return {x, z};
+//   };
+
+//   // Connect each node only to its immediate neighbors (8-connected)
+//   for (size_t i = 0; i < nodes.size(); ++i) {
+//     if (!nodes[i].walkable) continue;
+
+//     auto [gridX, gridZ] = getGridCoords(i);
+
+//     // Check 8 neighbors (4-directional + 4-diagonal)
+//     for (int dx = -1; dx <= 1; ++dx) {
+//       for (int dz = -1; dz <= 1; ++dz) {
+//         if (dx == 0 && dz == 0) continue;  // Skip self
+
+//         int neighborIndex = getNodeIndex(gridX + dx, gridZ + dz);
+//         if (neighborIndex == -1 ||
+//             neighborIndex >= static_cast<int>(nodes.size()))
+//           continue;
+//         if (!nodes[neighborIndex].walkable) continue;
+
+//         // Add bidirectional connection
+//         nodes[i].connections.push_back(neighborIndex);
+//       }
+//     }
+//   }
+// }
+
 void NavMesh::connectNodes() {
-  // Clear all existing connections first
   for (auto& node : nodes) {
     node.connections.clear();
   }
 
-  // OPTIMIZED: O(n) grid-based connection instead of O(n²)
-  // Calculate grid dimensions
-  int gridWidth =
-      static_cast<int>((maxBounds.x - minBounds.x) / nodeSpacing) + 1;
-  int gridHeight =
-      static_cast<int>((maxBounds.z - minBounds.z) / nodeSpacing) + 1;
+  if (gridWidth <= 0 || gridHeight <= 0) return;
 
-  // Lambda to convert 2D grid coordinates to 1D node index
-  auto getNodeIndex = [&](int x, int z) -> int {
-    if (x < 0 || x >= gridWidth || z < 0 || z >= gridHeight) return -1;
-    return z * gridWidth + x;
-  };
-
-  // Lambda to convert node index to grid coordinates
-  auto getGridCoords = [&](int nodeIndex) -> std::pair<int, int> {
-    int z = nodeIndex / gridWidth;
-    int x = nodeIndex % gridWidth;
-    return {x, z};
-  };
-
-  // Connect each node only to its immediate neighbors (8-connected)
   for (size_t i = 0; i < nodes.size(); ++i) {
     if (!nodes[i].walkable) continue;
 
-    auto [gridX, gridZ] = getGridCoords(i);
+    int gridZ = static_cast<int>(i / gridWidth);
+    int gridX = static_cast<int>(i % gridWidth);
 
-    // Check 8 neighbors (4-directional + 4-diagonal)
-    for (int dx = -1; dx <= 1; ++dx) {
-      for (int dz = -1; dz <= 1; ++dz) {
-        if (dx == 0 && dz == 0) continue;  // Skip self
+    for (int dz = -1; dz <= 1; ++dz) {
+      for (int dx = -1; dx <= 1; ++dx) {
+        if (dx == 0 && dz == 0) continue;
 
-        int neighborIndex = getNodeIndex(gridX + dx, gridZ + dz);
-        if (neighborIndex == -1 ||
-            neighborIndex >= static_cast<int>(nodes.size()))
-          continue;
+        int neighborIndex = gridCoordsToIndex(gridX + dx, gridZ + dz);
+        if (neighborIndex == -1) continue;
         if (!nodes[neighborIndex].walkable) continue;
 
-        // Add bidirectional connection
         nodes[i].connections.push_back(neighborIndex);
       }
     }
   }
 }
 
-// Removed addLimitedStrategicConnections() - too expensive O(n²) operation
-// 8-connected grid is sufficient for good pathfinding
+int NavMesh::gridCoordsToIndex(int x, int z) const {
+  if (x < 0 || x >= gridWidth || z < 0 || z >= gridHeight) return -1;
 
-int NavMesh::countNearbyObstacles(Vector3 position) const {
-  int count = 0;
-  float checkRadius = nodeSpacing * 2.5f;
+  return z * gridWidth + x;
+}
 
-  for (const auto& node : nodes) {
-    if (!node.walkable &&
-        Vector3Distance(position, node.position) <= checkRadius) {
-      count++;
-    }
-  }
+int NavMesh::positionToIndex(Vector3 position) const {
+  if (gridWidth <= 0 || gridHeight <= 0 || nodeSpacing <= 0.0f) return -1;
 
-  return count;
+  float localX = (position.x - minBounds.x) / nodeSpacing;
+  float localZ = (position.z - minBounds.z) / nodeSpacing;
+
+  int x = static_cast<int>(std::round(localX));
+  int z = static_cast<int>(std::round(localZ));
+
+  return gridCoordsToIndex(x, z);
 }
 
 void NavMesh::addObstacle(Vector3 position, Vector3 size,
@@ -202,22 +246,13 @@ int NavMesh::findNearestNode(Vector3 position) const {
 }
 
 bool NavMesh::isWalkable(Vector3 position) const {
-  int nearestNode = -1;
-  float minDistance = INFINITY;
+  int nodeIndex = positionToIndex(position);
+  if (nodeIndex == -1) return false;
 
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    float distance = Vector3Distance(position, nodes[i].position);
-    if (distance < minDistance) {
-      minDistance = distance;
-      nearestNode = static_cast<int>(i);
-    }
-  }
+  float distance = Vector3Distance(position, nodes[nodeIndex].position);
+  if (distance > nodeSpacing * 1.5f) return false;
 
-  if (nearestNode == -1 || minDistance > nodeSpacing * 1.5f) {
-    return false;
-  }
-
-  return nodes[nearestNode].walkable;
+  return nodes[nodeIndex].walkable;
 }
 
 std::vector<int> NavMesh::aStar(int startNode, int endNode) {
@@ -320,34 +355,25 @@ float NavMesh::calculateImprovedHeuristic(int nodeA, int nodeB) const {
   float euclideanDistance = Vector3Length(diff);
 
   // Add penalty for being near obstacles (encourages staying in open areas)
-  float obstaclePenalty = 0.0f;
-  int nearbyObstacles = 0;
-
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    if (i == nodeA || nodes[i].walkable) continue;
-
-    float distanceToObstacle = Vector3Distance(posA, nodes[i].position);
-    if (distanceToObstacle < nodeSpacing * 2.0f) {
-      nearbyObstacles++;
-      obstaclePenalty += (nodeSpacing * 2.0f - distanceToObstacle) * 0.1f;
-    }
+  float opennessPenalty = 0.0f;
+  int connectionCount = static_cast<int>(nodes[nodeA].connections.size());
+  if (connectionCount < 4) {
+    opennessPenalty = (4 - connectionCount) * nodeSpacing * 0.05f;
   }
 
-  // Slight preference for straight-line paths
-  Vector3 direction = Vector3Normalize(diff);
   float straightnessPenalty = 0.0f;
-  if (nodes[nodeA].parent != -1) {
+  if (nodes[nodeA].parent != -1 && euclideanDistance > 0.0f) {
     Vector3 prevDirection =
         Vector3Subtract(posA, nodes[nodes[nodeA].parent].position);
     if (Vector3Length(prevDirection) > 0.1f) {
       prevDirection = Vector3Normalize(prevDirection);
+      Vector3 direction = Vector3Normalize(diff);
       float dot = Vector3DotProduct(direction, prevDirection);
-      straightnessPenalty =
-          (1.0f - dot) * 0.2f;  // Penalty for direction changes
+      straightnessPenalty = (1.0f - dot) * 0.2f;
     }
   }
 
-  return euclideanDistance + obstaclePenalty + straightnessPenalty;
+  return euclideanDistance + opennessPenalty + straightnessPenalty;
 }
 
 float NavMesh::calculateMovementPenalty(int currentNode, int neighborNode,
@@ -401,7 +427,8 @@ bool NavMesh::hasLineOfSight(Vector3 from, Vector3 to) const {
     Vector3 samplePoint =
         Vector3Add(from, Vector3Scale(direction, distance * t));
 
-    if (!isWalkable(samplePoint)) {
+    int sampleIndex = positionToIndex(samplePoint);
+    if (sampleIndex == -1 || !nodes[sampleIndex].walkable) {
       return false;
     }
   }

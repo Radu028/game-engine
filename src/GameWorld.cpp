@@ -9,20 +9,20 @@
 #include "shop/Shop.h"
 #include "systems/PhysicsSystem.h"
 
-GameWorld* GameWorld::instance = nullptr;
+GameWorld *GameWorld::instance = nullptr;
 size_t GameWorld::totalObjectsCreated = 0;
 size_t GameWorld::totalObjectsDestroyed = 0;
 std::unordered_map<std::string, size_t> GameWorld::objectTypeCount;
 std::string GameWorld::creationTimestamp;
 
-GameWorld* GameWorld::getInstance(GameObject* player) {
+GameWorld *GameWorld::getInstance(GameObject *player) {
   if (instance == nullptr) {
     instance = new GameWorld(player);
   }
   return instance;
 }
 
-GameWorld::GameWorld(GameObject* player, const std::string& name)
+GameWorld::GameWorld(GameObject *player, const std::string &name)
     : player(player), worldName(name) {
   // Set creation timestamp
   auto now = std::time(nullptr);
@@ -72,14 +72,14 @@ void GameWorld::removeObject(std::shared_ptr<GameObject> object) {
   }
 
   objects.erase(std::remove_if(objects.begin(), objects.end(),
-                               [&](const std::shared_ptr<GameObject>& obj) {
+                               [&](const std::shared_ptr<GameObject> &obj) {
                                  return obj == object;
                                }),
                 objects.end());
 }
 
 void GameWorld::update(float deltaTime) {
-  for (auto& objSharedPtr : objects) {
+  for (auto &objSharedPtr : objects) {
     if (objSharedPtr.get() != player) {
       objSharedPtr->update(deltaTime);
     }
@@ -99,12 +99,12 @@ void GameWorld::update(float deltaTime) {
 }
 
 void GameWorld::draw() const {
-  for (const auto& obj : objects) {
+  for (const auto &obj : objects) {
     obj->draw();
   }
 }
 
-btDiscreteDynamicsWorld* GameWorld::getBulletWorld() const {
+btDiscreteDynamicsWorld *GameWorld::getBulletWorld() const {
   return physicsSystem ? physicsSystem->dynamicsWorld : nullptr;
 }
 
@@ -124,7 +124,7 @@ void GameWorld::initializeNavMesh() {
 
   // Register all existing objects with the new NavMesh
   // This calculates blocking ONCE for each static object
-  for (const auto& object : objects) {
+  for (const auto &object : objects) {
     if (object) {
       navigationMesh->registerObject(object.get());
     }
@@ -138,7 +138,7 @@ void GameWorld::initializeNavMesh() {
 
 // Obstacle management implementations
 void GameWorld::addObjectAsObstacle(std::shared_ptr<GameObject> object,
-                                    const std::string& type) {
+                                    const std::string &type) {
   if (!object) return;
 
   addObject(object);  // Add to world first
@@ -167,14 +167,14 @@ void GameWorld::removeObjectObstacle(std::shared_ptr<GameObject> object) {
 }
 
 void GameWorld::addObstacleAt(Vector3 position, Vector3 size,
-                              const std::string& type) {
+                              const std::string &type) {
   if (navigationMesh) {
     navigationMesh->addObstacle(position, size, type);
   }
 }
 
 void GameWorld::addObjectAsObstacleDeferred(std::shared_ptr<GameObject> object,
-                                            const std::string& type) {
+                                            const std::string &type) {
   if (!object) return;
 
   addObject(object);  // Add to world first

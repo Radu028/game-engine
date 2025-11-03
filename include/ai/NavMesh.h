@@ -45,14 +45,19 @@ class NavMesh {
   float groundLevel;  // Y level of the navmesh ground
   float npcHeight;    // Height of NPCs for blocking calculations
 
-  std::unordered_set<int> blockedNodeLookup;
-  std::vector<int> blockedNodeCache;
+  int gridWidth;
+  int gridHeight;
 
   // Global object registration for automatic updates
   std::vector<RegisteredObject> registeredObjects;
   std::unordered_set<GameObject*> objectSet;  // For fast lookup
 
+  std::unordered_set<int> blockedNodeLookup;
+  std::vector<int> blockedNodeCache;
+
   void setNodeWalkable(int nodeIndex, bool walkable);
+  int gridCoordsToIndex(int x, int z) const;
+  int positionToIndex(Vector3 position) const;
 
  public:
   NavMesh(Vector3 minBounds, Vector3 maxBounds, float spacing = 1.0f,
@@ -100,7 +105,6 @@ class NavMesh {
   float calculateMovementPenalty(int currentNode, int neighborNode,
                                  int targetNode) const;
   std::vector<int> smoothPath(const std::vector<int>& originalPath) const;
-  int countNearbyObstacles(Vector3 position) const;
   void connectNodes();
   bool hasLineOfSight(Vector3 from, Vector3 to) const;
 
