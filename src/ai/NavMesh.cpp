@@ -16,8 +16,31 @@ NavMesh::NavMesh(Vector3 minBounds, Vector3 maxBounds, float spacing,
       groundLevel(groundY),
       npcHeight(GameSettings::Character::HEIGHT) {}
 
+void NavMesh::setNodeWalkable(int nodeIndex, bool walkable) {
+  if (nodeIndex < 0 || nodeIndex >= static_cast<int>(nodes.size())) return;
+  if (nodes[nodeIndex].walkable == walkable) return;
+
+  nodes[nodeIndex].walkable = walkable;
+
+  if (!walkable) {
+    if (blockedNodeLookup.insert(nodeIndex).second) {
+      blockedNodeCache.push_back(nodeIndex);
+    }
+  } else {
+    if (blockedNodeLookup.erase(nodeIndex) > 0) {
+      auto it = std::find(blockedNodeCache.begin(), blockedNodeCache.end(),
+                          nodeIndex);
+      if (it != blockedNodeCache.end()) {
+        blockedNodeCache.erase(it);
+      }
+    }
+  }
+}
+
 void NavMesh::generateNavMesh() {
   nodes.clear();
+  blockedNodeLookup.clear();
+  blockedNodeCache.clear();
 
   for (float x = minBounds.x; x <= maxBounds.x; x += nodeSpacing) {
     for (float z = minBounds.z; z <= maxBounds.z; z += nodeSpacing) {
@@ -198,7 +221,11 @@ bool NavMesh::isWalkable(Vector3 position) const {
 }
 
 std::vector<int> NavMesh::aStar(int startNode, int endNode) {
-  // Reset all nodes
+  if (nodes.empty()) {
+    return {};
+  }
+
+  // Reset search state
   for (auto& node : nodes) {
     node.gCost = INFINITY;
     node.hCost = 0.0f;
@@ -206,75 +233,69 @@ std::vector<int> NavMesh::aStar(int startNode, int endNode) {
     node.parent = -1;
   }
 
-  // Improved comparison function with tie-breaking by heuristic
-  auto compare = [this](int a, int b) {
-    if (std::abs(nodes[a].fCost - nodes[b].fCost) < 0.001f) {
-      return nodes[a].hCost >
-             nodes[b].hCost;  // Prefer lower heuristic for tie-breaking
-    }
-    return nodes[a].fCost > nodes[b].fCost;
+  auto compare = [this](int lhs, int rhs) {
+    return nodes[lhs].fCost > nodes[rhs].fCost;
   };
 
   std::priority_queue<int, std::vector<int>, decltype(compare)> openSet(
       compare);
-  std::vector<bool> inOpenSet(nodes.size(), false);
-  std::vector<bool> inClosedSet(nodes.size(), false);
+  std::vector<bool> closedSet(nodes.size(), false);
 
   nodes[startNode].gCost = 0.0f;
   nodes[startNode].hCost = calculateHeuristic(startNode, endNode);
-  nodes[startNode].fCost = nodes[startNode].hCost;
+  nodes[startNode].fCost = nodes[startNode].gCost + nodes[startNode].hCost;
 
   openSet.push(startNode);
-  inOpenSet[startNode] = true;
 
-  // Early termination check for direct path
+  // Quick exit when the two points see each other
   if (hasLineOfSight(nodes[startNode].position, nodes[endNode].position)) {
     return {startNode, endNode};
   }
 
+  auto reconstructPath = [&](int node) {
+    std::vector<int> path;
+    while (node != -1) {
+      path.push_back(node);
+      node = nodes[node].parent;
+    }
+    std::reverse(path.begin(), path.end());
+    return path;
+  };
+
   while (!openSet.empty()) {
     int current = openSet.top();
     openSet.pop();
-    inOpenSet[current] = false;
 
-    if (current == endNode) {
-      // Reconstruct and smooth path
-      std::vector<int> path;
-      int node = endNode;
-      while (node != -1) {
-        path.push_back(node);
-        node = nodes[node].parent;
-      }
-      std::reverse(path.begin(), path.end());
-
-      // Apply path smoothing
-      return smoothPath(path);
+    if (closedSet[current]) {
+      continue;
     }
 
-    inClosedSet[current] = true;
+    closedSet[current] = true;
+
+    if (current == endNode) {
+      return smoothPath(reconstructPath(endNode));
+    }
 
     for (int neighbor : nodes[current].connections) {
-      if (!nodes[neighbor].walkable || inClosedSet[neighbor]) {
+      if (!nodes[neighbor].walkable || closedSet[neighbor]) {
         continue;
       }
 
-      // Improved cost calculation with movement penalties
-      float baseCost = calculateDistance(current, neighbor);
+      float stepCost = calculateDistance(current, neighbor);
       float movementPenalty =
           calculateMovementPenalty(current, neighbor, endNode);
-      float tentativeGCost = nodes[current].gCost + baseCost + movementPenalty;
+      float tentativeG = nodes[current].gCost + stepCost + movementPenalty;
 
-      if (tentativeGCost < nodes[neighbor].gCost) {
-        nodes[neighbor].parent = current;
-        nodes[neighbor].gCost = tentativeGCost;
-        nodes[neighbor].hCost = calculateImprovedHeuristic(neighbor, endNode);
-        nodes[neighbor].fCost = nodes[neighbor].gCost + nodes[neighbor].hCost;
-
-        if (!inOpenSet[neighbor]) {
-          openSet.push(neighbor);
-          inOpenSet[neighbor] = true;
-        }
+      if (tentativeG >= nodes[neighbor].gCost) {
+        continue;
       }
+
+      nodes[neighbor].parent = current;
+      nodes[neighbor].gCost = tentativeG;
+      nodes[neighbor].hCost = calculateImprovedHeuristic(neighbor, endNode);
+      nodes[neighbor].fCost = nodes[neighbor].gCost + nodes[neighbor].hCost;
+
+      openSet.push(neighbor);
     }
   }
 

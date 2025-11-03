@@ -45,9 +45,14 @@ class NavMesh {
   float groundLevel;  // Y level of the navmesh ground
   float npcHeight;    // Height of NPCs for blocking calculations
 
+  std::unordered_set<int> blockedNodeLookup;
+  std::vector<int> blockedNodeCache;
+
   // Global object registration for automatic updates
   std::vector<RegisteredObject> registeredObjects;
   std::unordered_set<GameObject*> objectSet;  // For fast lookup
+
+  void setNodeWalkable(int nodeIndex, bool walkable);
 
  public:
   NavMesh(Vector3 minBounds, Vector3 maxBounds, float spacing = 1.0f,

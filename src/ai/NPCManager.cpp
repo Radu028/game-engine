@@ -8,7 +8,7 @@ NPCManager* NPCManager::instance = nullptr;
 
 NPCManager::NPCManager()
     : spawnTimer(0.0f),
-      spawnInterval(5.0f),
+      spawnInterval(0.5f),
       minSpawnInterval(3.0f),
       maxSpawnInterval(8.0f),
       maxActiveNPCs(5),
