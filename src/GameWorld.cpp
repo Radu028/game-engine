@@ -6,7 +6,6 @@
 
 #include "ai/NPC.h"
 #include "ai/NavMesh.h"
-#include "shop/Shop.h"
 #include "systems/PhysicsSystem.h"
 
 GameWorld *GameWorld::instance = nullptr;

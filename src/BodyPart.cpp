@@ -23,9 +23,7 @@ BodyPart::BodyPart(Vector3 position, Vector3 size, Color color,
 
   if (useShaders) {
     ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-    if (shaderSystem->isInitialized()) {
-      model.materials[0].shader = shaderSystem->getShader();
-    }
+    model.materials[0].shader = shaderSystem->getShader();
   }
 }
 
@@ -45,9 +43,7 @@ BodyPart::BodyPart(const BodyPart& other)
   model = LoadModelFromMesh(GenMeshCube(size.x, size.y, size.z));
   if (useShaders) {
     ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-    if (shaderSystem->isInitialized()) {
-      model.materials[0].shader = shaderSystem->getShader();
-    }
+    model.materials[0].shader = shaderSystem->getShader();
   }
 }
 
