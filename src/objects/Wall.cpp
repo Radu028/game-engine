@@ -12,9 +12,7 @@ Wall::Wall(Vector3 position, Vector3 dimensions, Color color, bool hasCollision,
       LoadModelFromMesh(GenMeshCube(dimensions.x, dimensions.y, dimensions.z));
 
   ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-  if (shaderSystem->isInitialized()) {
-    model.materials[0].shader = shaderSystem->getShader();
-  }
+  model.materials[0].shader = shaderSystem->getShader();
 }
 
 void Wall::draw() const {

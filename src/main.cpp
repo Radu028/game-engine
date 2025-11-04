@@ -20,9 +20,6 @@ int main() {
     EnableCursor();
 
     ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-    if (!shaderSystem->initialize()) {
-      throw GameInitException("Failed to initialize shader system");
-    }
 
     Camera3D camera = {{0.0f, 5.0f, 5.0f},
                        {0.0f, 0.0f, 0.0f},
@@ -85,11 +82,11 @@ int main() {
       float angleXRad = cameraAngleX * DEG2RAD;
       float angleYRad = cameraAngleY * DEG2RAD;
 
-      camera.target = (Vector3){
-          playerPos.x, playerPos.y + GameSettings::Camera::TARGET_Y_OFFSET,
-          playerPos.z};
+      camera.target = {playerPos.x,
+                       playerPos.y + GameSettings::Camera::TARGET_Y_OFFSET,
+                       playerPos.z};
 
-      camera.position = (Vector3){
+      camera.position = {
           playerPos.x + cameraDistance * cosf(angleYRad) * sinf(angleXRad),
           playerPos.y + GameSettings::Camera::TARGET_Y_OFFSET +
               cameraDistance * sinf(angleYRad),

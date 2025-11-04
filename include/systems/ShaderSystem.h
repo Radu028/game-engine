@@ -6,7 +6,6 @@ class ShaderSystem {
  private:
   static ShaderSystem* instance;
   Shader lightingShader;
-  bool initialized;
 
   // Sun lighting properties
   Vector3 sunDirection;
@@ -24,7 +23,7 @@ class ShaderSystem {
   static ShaderSystem* getInstance();
   ~ShaderSystem();
 
-  bool initialize();
+  void initialize();
   void cleanup();
 
   // Shader management
@@ -34,5 +33,4 @@ class ShaderSystem {
   void updateUniforms(const Camera3D& camera);
 
   Shader getShader() const { return lightingShader; }
-  bool isInitialized() const { return initialized; }
 };

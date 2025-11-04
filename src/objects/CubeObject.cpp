@@ -29,9 +29,7 @@ CubeObject::CubeObject(Vector3 position, Vector3 size, Color color,
   // If using shaders, assign the lighting shader to the model material
   if (useShaders) {
     ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-    if (shaderSystem->isInitialized()) {
-      model.materials[0].shader = shaderSystem->getShader();
-    }
+    model.materials[0].shader = shaderSystem->getShader();
   }
 }
 
@@ -52,9 +50,7 @@ CubeObject::CubeObject(const CubeObject& other)
   // If using shaders, assign the lighting shader to the model material
   if (useShaders) {
     ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-    if (shaderSystem->isInitialized()) {
-      model.materials[0].shader = shaderSystem->getShader();
-    }
+    model.materials[0].shader = shaderSystem->getShader();
   }
 }
 

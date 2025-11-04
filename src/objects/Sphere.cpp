@@ -11,9 +11,7 @@ Sphere::Sphere(Vector3 position, float radius, Color color, bool hasCollisions,
   model = LoadModelFromMesh(GenMeshSphere(radius, 32, 32));
 
   ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-  if (shaderSystem->isInitialized()) {
-    model.materials[0].shader = shaderSystem->getShader();
-  }
+  model.materials[0].shader = shaderSystem->getShader();
 }
 
 void Sphere::draw() const {
