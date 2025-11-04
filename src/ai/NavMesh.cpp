@@ -49,9 +49,9 @@ void NavMesh::generateNavMesh() {
   float heightSpan = maxBounds.z - minBounds.z;
 
   gridWidth =
-      std::max(1, static_cast<int>(std::lround(widthSpan / nodeSpacing)) + 1);
+      std::max(1, static_cast<int>(std::floor(widthSpan / nodeSpacing)) + 1);
   gridHeight =
-      std::max(1, static_cast<int>(std::lround(heightSpan / nodeSpacing)) + 1);
+      std::max(1, static_cast<int>(std::floor(heightSpan / nodeSpacing)) + 1);
 
   nodes.reserve(static_cast<size_t>(gridWidth) *
                 static_cast<size_t>(gridHeight));
