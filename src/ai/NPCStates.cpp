@@ -182,7 +182,7 @@ void ShoppingState::moveToShelf(NPC* npc, std::shared_ptr<Shelf> shelf) {
   // If very close to shelf, start looking
   if (Vector3Distance(npcPos, shelfPos) < 2.5f) {
     isLookingAtShelf = true;
-    shelfLookingTimer = 10.0f;
+    shelfLookingTimer = 0.0f;
   }
 }
 

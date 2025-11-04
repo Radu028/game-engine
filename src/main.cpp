@@ -54,40 +54,11 @@ int main() {
 
     GameManager* gameManager = GameManager::getInstance();
 
-    bool dynamicSun = false;
-
     while (!WindowShouldClose()) {
       float deltaTime = GetFrameTime();
 
       if (IsKeyPressed(KEY_F1)) {
         debugMode = !debugMode;
-      }
-
-      if (IsKeyPressed(KEY_F2)) {
-        dynamicSun = !dynamicSun;
-      }
-
-      if (!dynamicSun) {
-        if (IsKeyDown(KEY_LEFT)) {
-          Vector3 sunDir = shaderSystem->getSunDirection();
-          sunDir.x += deltaTime;
-          shaderSystem->setSunDirection(sunDir);
-        }
-        if (IsKeyDown(KEY_RIGHT)) {
-          Vector3 sunDir = shaderSystem->getSunDirection();
-          sunDir.x -= deltaTime;
-          shaderSystem->setSunDirection(sunDir);
-        }
-        if (IsKeyDown(KEY_UP)) {
-          Vector3 sunDir = shaderSystem->getSunDirection();
-          sunDir.y += deltaTime;
-          shaderSystem->setSunDirection(sunDir);
-        }
-        if (IsKeyDown(KEY_DOWN)) {
-          Vector3 sunDir = shaderSystem->getSunDirection();
-          sunDir.y -= deltaTime;
-          shaderSystem->setSunDirection(sunDir);
-        }
       }
 
       InputSystem::updateMouseCamera();
@@ -106,12 +77,6 @@ int main() {
       if (wheelMove != 0) {
         cameraDistance = std::clamp(cameraDistance - wheelMove * 2.0f,
                                     minCameraDistance, maxCameraDistance);
-      }
-
-      shaderSystem->updateTime(deltaTime);
-
-      if (dynamicSun) {
-        shaderSystem->enableDynamicSun(true);
       }
 
       player1->handleInput(GameSettings::Character::MOVEMENT_SPEED,
