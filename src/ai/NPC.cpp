@@ -9,8 +9,8 @@
 
 std::shared_ptr<NavMesh> NPC::navMesh = nullptr;
 
-NPC::NPC(Vector3 position, std::shared_ptr<Shop> shop)
-    : HumanoidCharacter(position),
+NPC::NPC(Vector3 position, std::shared_ptr<Shop> shop, GameWorld* world)
+    : HumanoidCharacter(position, world),
       targetShop(shop),
       chatSystem(nullptr),
       movementSpeed(3.0f),

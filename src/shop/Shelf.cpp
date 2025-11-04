@@ -70,7 +70,7 @@ void Shelf::restockShelf(FruitType type, int quantity) {
     auto newFruit = std::make_shared<Fruit>(fruitPos, type);
     addFruit(newFruit);
 
-    if (GameWorld* world = GameWorld::getInstance(nullptr)) {
+    if (GameWorld* world = GameWorld::getInstance()) {
       world->addObject(newFruit);
     }
   }

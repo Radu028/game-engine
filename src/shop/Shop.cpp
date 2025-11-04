@@ -60,7 +60,7 @@ void Shop::createShelves() {
   auto centerShelf = std::make_shared<Shelf>(centerShelfPos);
   shelves.push_back(centerShelf);
 
-  if (GameWorld* world = GameWorld::getInstance(nullptr)) {
+  if (GameWorld* world = GameWorld::getInstance()) {
     for (auto& shelf : shelves) {
       world->addObjectAsObstacleDeferred(shelf);
     }
@@ -145,7 +145,7 @@ Vector3 Shop::calculateInteriorBounds() const {
 }
 
 void Shop::finalizeNavMesh() {
-  if (GameWorld* world = GameWorld::getInstance(nullptr)) {
+  if (GameWorld* world = GameWorld::getInstance()) {
     world->finalizeObstacles();
   }
 }

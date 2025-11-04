@@ -30,7 +30,7 @@ bool HumanoidCharacter::areCharactersOverlapping(
   return calculateDistance(char1, char2) < 2.0f;  // Less than 2 units apart
 }
 
-HumanoidCharacter::HumanoidCharacter(Vector3 position)
+HumanoidCharacter::HumanoidCharacter(Vector3 position, GameWorld* gameWorld)
     : GameObject(position, true, true, false),
       // Initialize body parts with calculated offsets
       head(GameSettings::BodyParts::HEAD_SIZE,
@@ -112,6 +112,11 @@ HumanoidCharacter::HumanoidCharacter(Vector3 position)
            0.26f}) {
   totalCharactersCreated++;
   activeCharacters++;
+
+  if (gameWorld) {
+    setWorld(gameWorld);
+    setupPhysics(gameWorld->getDynamicsWorld());
+  }
 }
 
 HumanoidCharacter::~HumanoidCharacter() {
@@ -822,9 +827,9 @@ bool HumanoidCharacter::checkAnyPartCollision(
 bool HumanoidCharacter::wouldCollideAfterMovement(Vector3 movement,
                                                   float deltaTime) const {
   if (!world) return false;  // No world to check against
+  if (!characterBody) return false;
 
   // Calculate predicted position after movement
-  btVector3 currentVelocity = characterBody->getLinearVelocity();
   Vector3 predictedMovement = {movement.x * deltaTime,
                                0,  // Don't predict Y movement for simplicity
                                movement.z * deltaTime};
@@ -832,57 +837,23 @@ bool HumanoidCharacter::wouldCollideAfterMovement(Vector3 movement,
   // Temporarily store current character position
   Vector3 originalPos = getPosition();
 
-  // Create temporary character parts at predicted positions
-  HumanoidVisualPart tempHead = head;
-  HumanoidVisualPart tempTorso = torso;
-  HumanoidVisualPart tempLeftArm = leftArm;
-  HumanoidVisualPart tempRightArm = rightArm;
-  HumanoidVisualPart tempLeftLeg = leftLeg;
-  HumanoidVisualPart tempRightLeg = rightLeg;
-
-  // Offset the parts by predicted movement
-  tempHead.currentOffset =
-      Vector3Add(tempHead.currentOffset, predictedMovement);
-  tempTorso.currentOffset =
-      Vector3Add(tempTorso.currentOffset, predictedMovement);
-  tempLeftArm.currentOffset =
-      Vector3Add(tempLeftArm.currentOffset, predictedMovement);
-  tempRightArm.currentOffset =
-      Vector3Add(tempRightArm.currentOffset, predictedMovement);
-  tempLeftLeg.currentOffset =
-      Vector3Add(tempLeftLeg.currentOffset, predictedMovement);
-  tempRightLeg.currentOffset =
-      Vector3Add(tempRightLeg.currentOffset, predictedMovement);
-
   // Check predicted positions against world obstacles
   Vector3 predictedPosition = Vector3Add(originalPos, predictedMovement);
 
-  // Create bounding boxes for predicted character parts
-  Vector3 headPos = Vector3Add(predictedPosition, tempHead.currentOffset);
-  Vector3 torsoPos = Vector3Add(predictedPosition, tempTorso.currentOffset);
-  Vector3 leftArmPos = Vector3Add(predictedPosition, tempLeftArm.currentOffset);
-  Vector3 rightArmPos =
-      Vector3Add(predictedPosition, tempRightArm.currentOffset);
-  Vector3 leftLegPos = Vector3Add(predictedPosition, tempLeftLeg.currentOffset);
-  Vector3 rightLegPos =
-      Vector3Add(predictedPosition, tempRightLeg.currentOffset);
+  auto computePredictedBox = [&](const HumanoidVisualPart& part) {
+    Vector3 offset = Vector3Add(part.currentOffset, predictedMovement);
+    Vector3 center = Vector3Add(predictedPosition, offset);
+    Vector3 halfSize = Vector3Scale(part.visual.getSize(), 0.5f);
+    return BoundingBox{Vector3Subtract(center, halfSize),
+                       Vector3Add(center, halfSize)};
+  };
 
-  // Get bounding boxes for each part at predicted positions
-  BoundingBox predictedHeadBox = {
-      {headPos.x - tempHead.visual.getSize().x / 2,
-       headPos.y - tempHead.visual.getSize().y / 2,
-       headPos.z - tempHead.visual.getSize().z / 2},
-      {headPos.x + tempHead.visual.getSize().x / 2,
-       headPos.y + tempHead.visual.getSize().y / 2,
-       headPos.z + tempHead.visual.getSize().z / 2}};
-
-  BoundingBox predictedTorsoBox = {
-      {torsoPos.x - tempTorso.visual.getSize().x / 2,
-       torsoPos.y - tempTorso.visual.getSize().y / 2,
-       torsoPos.z - tempTorso.visual.getSize().z / 2},
-      {torsoPos.x + tempTorso.visual.getSize().x / 2,
-       torsoPos.y + tempTorso.visual.getSize().y / 2,
-       torsoPos.z + tempTorso.visual.getSize().z / 2}};
+  const BoundingBox predictedHeadBox = computePredictedBox(head);
+  const BoundingBox predictedTorsoBox = computePredictedBox(torso);
+  const BoundingBox predictedLeftArmBox = computePredictedBox(leftArm);
+  const BoundingBox predictedRightArmBox = computePredictedBox(rightArm);
+  const BoundingBox predictedLeftLegBox = computePredictedBox(leftLeg);
+  const BoundingBox predictedRightLegBox = computePredictedBox(rightLeg);
 
   // Check against world objects (simple implementation)
   // This is a basic collision prediction - in a full implementation,
@@ -895,7 +866,11 @@ bool HumanoidCharacter::wouldCollideAfterMovement(Vector3 movement,
 
     // Check if any predicted part would collide
     if (CheckCollisionBoxes(predictedHeadBox, objBox) ||
-        CheckCollisionBoxes(predictedTorsoBox, objBox)) {
+        CheckCollisionBoxes(predictedTorsoBox, objBox) ||
+        CheckCollisionBoxes(predictedLeftArmBox, objBox) ||
+        CheckCollisionBoxes(predictedRightArmBox, objBox) ||
+        CheckCollisionBoxes(predictedLeftLegBox, objBox) ||
+        CheckCollisionBoxes(predictedRightLegBox, objBox)) {
       return true;
     }
   }

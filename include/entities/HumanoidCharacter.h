@@ -75,7 +75,7 @@ class HumanoidCharacter : public GameObject {
   static int getTotalCharactersCreated() { return totalCharactersCreated; }
   static int getActiveCharacterCount() { return activeCharacters; }
 
-  HumanoidCharacter(Vector3 position);
+  HumanoidCharacter(Vector3 position, GameWorld* gameWorld = nullptr);
   ~HumanoidCharacter();
 
   void setupPhysics(btDiscreteDynamicsWorld* bulletWorld);
@@ -84,6 +84,8 @@ class HumanoidCharacter : public GameObject {
   void draw() const override;
   BoundingBox getBoundingBox() const override;
   std::unique_ptr<GameObject> clone() const override;
+
+  std::string getObstacleType() const override { return "character"; }
 
   // Movement and control
   void handleInput(float movementSpeed, float cameraAngleX = 0.0f);

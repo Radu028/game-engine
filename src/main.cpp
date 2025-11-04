@@ -36,12 +36,11 @@ int main() {
     const float maxVerticalAngle = 89.0f;
     const float minVerticalAngle = -89.0f;
 
-    auto player1 =
-        std::make_shared<HumanoidCharacter>((Vector3){0.0f, 1.0f, 15.0f});
+    GameWorld* world = GameWorld::getInstance();
 
-    GameWorld* world = GameWorld::getInstance(player1.get());
-    player1->setWorld(world);
-    player1->setupPhysics(world->getDynamicsWorld());
+    auto player1 = std::make_shared<HumanoidCharacter>(
+        (Vector3){0.0f, 1.0f, 15.0f}, world);
+    world->addObject(player1);
 
     world->addObject(std::make_shared<Floor>((Vector3){0.0f, 0.0f, 0.0f},
                                              (Vector3){50.0f, 1.0f, 50.0f},
@@ -72,7 +71,6 @@ int main() {
 
       player1->handleInput(GameSettings::Character::MOVEMENT_SPEED,
                            cameraAngleX);
-      player1->update(deltaTime);
 
       gameManager->update(deltaTime);
       world->update(deltaTime);
@@ -99,7 +97,6 @@ int main() {
 
       BeginMode3D(camera);
 
-      player1->draw();
       world->draw();
       gameManager->render(camera);
 

@@ -51,7 +51,8 @@ class NPC : public HumanoidCharacter {
   bool hasTriedAlternative;
 
  public:
-  NPC(Vector3 position, std::shared_ptr<Shop> shop);
+  NPC(Vector3 position, std::shared_ptr<Shop> shop,
+      GameWorld* world = nullptr);
   ~NPC() override;
 
   // State management

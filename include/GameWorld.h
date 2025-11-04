@@ -10,7 +10,6 @@
 
 class PhysicsSystem;
 class GameObject;
-class Player;
 class btDiscreteDynamicsWorld;
 
 class GameWorld {
@@ -22,19 +21,18 @@ class GameWorld {
   static std::string creationTimestamp;
 
   std::vector<std::shared_ptr<GameObject>> objects;
-  GameObject* player;
   std::unique_ptr<PhysicsSystem> physicsSystem;
   std::shared_ptr<NavMesh> navigationMesh;
   std::string worldName;
 
-  GameWorld(GameObject* player, const std::string& name = "DefaultWorld");
+  explicit GameWorld(const std::string& name = "DefaultWorld");
 
   GameWorld(const GameWorld&) = delete;
   GameWorld& operator=(const GameWorld&) = delete;
   ~GameWorld();
 
  public:
-  static GameWorld* getInstance(GameObject* player = nullptr);
+  static GameWorld* getInstance();
   static void destroyInstance();
 
   static size_t getTotalObjectsCreated() { return totalObjectsCreated; }
@@ -113,7 +111,6 @@ class GameWorld {
   }
   size_t getObjectCount() const { return objects.size(); }
   const std::string& getWorldName() const { return worldName; }
-  GameObject* getPlayer() const { return player; }
 
   void setWorldName(const std::string& name) { worldName = name; }
 

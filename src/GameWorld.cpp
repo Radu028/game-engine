@@ -2,10 +2,11 @@
 
 #include <algorithm>
 #include <ctime>
-#include <sstream>
+#include <string>
 
 #include "ai/NPC.h"
 #include "ai/NavMesh.h"
+#include "entities/HumanoidCharacter.h"
 #include "systems/PhysicsSystem.h"
 
 GameWorld *GameWorld::instance = nullptr;
@@ -14,25 +15,19 @@ size_t GameWorld::totalObjectsDestroyed = 0;
 std::unordered_map<std::string, size_t> GameWorld::objectTypeCount;
 std::string GameWorld::creationTimestamp;
 
-GameWorld *GameWorld::getInstance(GameObject *player) {
+GameWorld *GameWorld::getInstance() {
   if (instance == nullptr) {
-    instance = new GameWorld(player);
+    instance = new GameWorld();
   }
   return instance;
 }
 
-GameWorld::GameWorld(GameObject *player, const std::string &name)
-    : player(player), worldName(name) {
+GameWorld::GameWorld(const std::string &name) : worldName(name) {
   // Set creation timestamp
   auto now = std::time(nullptr);
-  std::stringstream ss;
-  creationTimestamp = ss.str();
+  creationTimestamp = std::to_string(now);
 
   physicsSystem = std::make_unique<PhysicsSystem>(this);
-
-  if (this->player) {
-    physicsSystem->addObject(this->player);
-  }
 }
 
 GameWorld::~GameWorld() {
@@ -45,12 +40,16 @@ void GameWorld::addObject(std::shared_ptr<GameObject> object) {
   if (!object) return;
 
   objects.push_back(object);
-  if (physicsSystem) {
+
+  const bool usesCustomPhysics =
+      dynamic_cast<HumanoidCharacter *>(object.get()) != nullptr;
+
+  if (physicsSystem && !usesCustomPhysics) {
     physicsSystem->addObject(object.get());
   }
 
-  // Automatically register object with NavMesh for professional pathfinding
-  if (navigationMesh) {
+  // Automatically register static objects with NavMesh
+  if (navigationMesh && object->getIsStatic()) {
     // Skip NPC bodies from being treated as obstacles when registering
     if (object->getObstacleType() != "npc") {
       navigationMesh->registerObject(object.get());
@@ -61,12 +60,15 @@ void GameWorld::addObject(std::shared_ptr<GameObject> object) {
 void GameWorld::removeObject(std::shared_ptr<GameObject> object) {
   if (!object) return;
 
-  if (physicsSystem) {
+  const bool usesCustomPhysics =
+      dynamic_cast<HumanoidCharacter *>(object.get()) != nullptr;
+
+  if (physicsSystem && !usesCustomPhysics) {
     physicsSystem->removeObject(object.get());
   }
 
   // Automatically unregister object from NavMesh
-  if (navigationMesh) {
+  if (navigationMesh && object->getIsStatic()) {
     navigationMesh->unregisterObject(object.get());
   }
 
@@ -79,7 +81,7 @@ void GameWorld::removeObject(std::shared_ptr<GameObject> object) {
 
 void GameWorld::update(float deltaTime) {
   for (auto &objSharedPtr : objects) {
-    if (objSharedPtr.get() != player) {
+    if (objSharedPtr) {
       objSharedPtr->update(deltaTime);
     }
   }
@@ -91,9 +93,6 @@ void GameWorld::update(float deltaTime) {
   // Optimized NavMesh: only cleans up invalid objects, no position updates
   if (navigationMesh) {
     navigationMesh->updateAllRegisteredObjects();
-  }
-
-  if (player) {
   }
 }
 
@@ -124,7 +123,7 @@ void GameWorld::initializeNavMesh() {
   // Register all existing objects with the new NavMesh
   // This calculates blocking ONCE for each static object
   for (const auto &object : objects) {
-    if (object) {
+    if (object && object->getIsStatic()) {
       navigationMesh->registerObject(object.get());
     }
   }

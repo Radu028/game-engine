@@ -70,10 +70,8 @@ void NPCManager::spawnNPC() {
     activeNPCs.push_back(newNPC);
     newNPC->addObserver(this);
 
-    if (GameWorld* world = GameWorld::getInstance(nullptr)) {
+    if (GameWorld* world = GameWorld::getInstance()) {
       world->addObject(newNPC);
-
-      newNPC->setupPhysics(world->getDynamicsWorld());
     }
 
     totalNPCsSpawned++;
@@ -86,22 +84,22 @@ void NPCManager::spawnNPC() {
 }
 
 void NPCManager::removeInactiveNPCs() {
-  auto it = std::remove_if(
-      activeNPCs.begin(), activeNPCs.end(),
-      [this](const std::shared_ptr<NPC>& npc) {
-        if (!npc->getIsActive()) {
-          npc->removeObserver(this);
+  auto it =
+      std::remove_if(activeNPCs.begin(), activeNPCs.end(),
+                     [this](const std::shared_ptr<NPC>& npc) {
+                       if (!npc->getIsActive()) {
+                         npc->removeObserver(this);
 
-          // Remove from game world
-          if (GameWorld* world = GameWorld::getInstance(nullptr)) {
-            npc->removeFromPhysics(world->getDynamicsWorld());
-            world->removeObject(npc);
-          }
+                         // Remove from game world
+                         if (GameWorld* world = GameWorld::getInstance()) {
+                           npc->removeFromPhysics(world->getDynamicsWorld());
+                           world->removeObject(npc);
+                         }
 
-          return true;
-        }
-        return false;
-      });
+                         return true;
+                       }
+                       return false;
+                     });
 
   activeNPCs.erase(it, activeNPCs.end());
 }
@@ -112,7 +110,8 @@ std::shared_ptr<NPC> NPCManager::createNPC() {
   }
 
   Vector3 spawnPos = getRandomSpawnPosition();
-  auto npc = std::make_shared<NPC>(spawnPos, shop);
+  GameWorld* world = GameWorld::getInstance();
+  auto npc = std::make_shared<NPC>(spawnPos, shop, world);
 
   return npc;
 }
