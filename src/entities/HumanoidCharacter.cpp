@@ -759,46 +759,6 @@ void HumanoidCharacter::draw() const {
   rightEyebrow.visual.draw();
 }
 
-void HumanoidCharacter::drawCollisionBoxes() const {
-  // Draw wireframe boxes around each body part for debugging
-  BoundingBox headBox = getPartBoundingBox(head);
-  BoundingBox torsoBox = getPartBoundingBox(torso);
-  BoundingBox leftArmBox = getPartBoundingBox(leftArm);
-  BoundingBox rightArmBox = getPartBoundingBox(rightArm);
-  BoundingBox leftLegBox = getPartBoundingBox(leftLeg);
-  BoundingBox rightLegBox = getPartBoundingBox(rightLeg);
-
-  // Draw collision boxes in different colors per collision group
-  DrawBoundingBox(headBox, PURPLE);      // Head group
-  DrawBoundingBox(torsoBox, BLUE);       // Torso group
-  DrawBoundingBox(leftArmBox, GREEN);    // Arms group
-  DrawBoundingBox(rightArmBox, GREEN);   // Arms group
-  DrawBoundingBox(leftLegBox, ORANGE);   // Legs group
-  DrawBoundingBox(rightLegBox, ORANGE);  // Legs group
-
-  // Draw physics body positions as small spheres if they exist
-  if (headPhysics.body) {
-    btTransform transform = headPhysics.body->getWorldTransform();
-    btVector3 origin = transform.getOrigin();
-    DrawSphere({origin.x(), origin.y(), origin.z()}, 0.05f, PURPLE);
-  }
-  if (torsoPhysics.body) {
-    btTransform transform = torsoPhysics.body->getWorldTransform();
-    btVector3 origin = transform.getOrigin();
-    DrawSphere({origin.x(), origin.y(), origin.z()}, 0.05f, BLUE);
-  }
-  if (leftLegPhysics.body) {
-    btTransform transform = leftLegPhysics.body->getWorldTransform();
-    btVector3 origin = transform.getOrigin();
-    DrawSphere({origin.x(), origin.y(), origin.z()}, 0.05f, ORANGE);
-  }
-  if (rightLegPhysics.body) {
-    btTransform transform = rightLegPhysics.body->getWorldTransform();
-    btVector3 origin = transform.getOrigin();
-    DrawSphere({origin.x(), origin.y(), origin.z()}, 0.05f, ORANGE);
-  }
-}
-
 BoundingBox HumanoidCharacter::getBoundingBox() const {
   Vector3 torsoPos = getTorsoPosition();
   Vector3 min = {torsoPos.x - 0.5f, torsoPos.y - 1.0f, torsoPos.z - 0.5f};

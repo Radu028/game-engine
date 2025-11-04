@@ -82,7 +82,6 @@ class HumanoidCharacter : public GameObject {
   void removeFromPhysics(btDiscreteDynamicsWorld* bulletWorld);
   void update(float deltaTime) override;
   void draw() const override;
-  void drawCollisionBoxes() const;  // For debugging individual part collisions
   BoundingBox getBoundingBox() const override;
   std::unique_ptr<GameObject> clone() const override;
 

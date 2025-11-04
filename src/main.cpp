@@ -39,8 +39,6 @@ int main() {
     const float maxVerticalAngle = 89.0f;
     const float minVerticalAngle = -89.0f;
 
-    bool debugMode = false;
-
     auto player1 =
         std::make_shared<HumanoidCharacter>((Vector3){0.0f, 1.0f, 15.0f});
 
@@ -56,10 +54,6 @@ int main() {
 
     while (!WindowShouldClose()) {
       float deltaTime = GetFrameTime();
-
-      if (IsKeyPressed(KEY_F1)) {
-        debugMode = !debugMode;
-      }
 
       InputSystem::updateMouseCamera();
 
@@ -107,13 +101,11 @@ int main() {
       ClearBackground(RAYWHITE);
 
       BeginMode3D(camera);
+
       player1->draw();
       world->draw();
       gameManager->render(camera);
 
-      if (debugMode) {
-        player1->drawCollisionBoxes();
-      }
       EndMode3D();
 
       EndDrawing();
