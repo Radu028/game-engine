@@ -1,5 +1,7 @@
 #include "objects/Wall.h"
 
+#include <btBulletDynamicsCommon.h>
+#include "physics/PhysicsTypes.h"
 #include "systems/ShaderSystem.h"
 
 Wall::Wall(Vector3 position, Vector3 dimensions, Color color, bool hasCollision,
@@ -36,4 +38,23 @@ BoundingBox Wall::getBoundingBox() const {
 
 std::unique_ptr<GameObject> Wall::clone() const {
   return std::make_unique<Wall>(*this);
+}
+
+PhysicsBodyConfig Wall::getPhysicsConfig() const {
+  PhysicsBodyConfig config;
+  config.usesPhysics = hasCollision;
+  config.collider = ColliderType::Box;
+  config.dimensions = dimensions;
+  config.isStatic = true;
+  config.affectedByGravity = false;
+  return config;
+}
+
+void Wall::configurePhysicsBody(btRigidBody& body) const {
+  body.setFriction(1.0f);
+  body.setRollingFriction(0.4f);
+  body.setSpinningFriction(0.4f);
+  body.setDamping(0.2f, 0.2f);
+  body.setCollisionFlags(body.getCollisionFlags() |
+                         btCollisionObject::CF_STATIC_OBJECT);
 }

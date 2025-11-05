@@ -1,5 +1,4 @@
-#ifndef INPUTSYSTEM_H
-#define INPUTSYSTEM_H
+#pragma once
 
 #include "raylib.h"
 
@@ -18,5 +17,3 @@ class InputSystem {
   static bool mouseCameraEnabled;
   static Vector2 lastMousePosition;
 };
-
-#endif

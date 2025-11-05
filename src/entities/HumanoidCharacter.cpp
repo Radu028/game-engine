@@ -207,6 +207,8 @@ void HumanoidCharacter::removeFromPhysics(
 
   // Remove all individual physics bodies
   removeAllPhysicsBodies();
+
+  physicsWorld = nullptr;
 }
 
 void HumanoidCharacter::update(float deltaTime) {
@@ -415,63 +417,13 @@ void HumanoidCharacter::updateVisualPositions() {
 // updateFacialFeatures() method removed - now integrated into
 // updateVisualPositions() for efficiency
 
-void HumanoidCharacter::handleInput(float movementSpeed, float cameraAngleX) {
-  if (!characterBody) return;
-
-  Vector3 movement = {0, 0, 0};
-
-  // Get input axes
-  float inputX = 0.0f;
-  float inputZ = 0.0f;
-
-  if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) {
-    inputZ += 1.0f;
-  }
-  if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) {
-    inputZ -= 1.0f;
-  }
-  if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) {
-    inputX -= 1.0f;
-  }
-  if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) {
-    inputX += 1.0f;
-  }
-
-  float cameraRad = cameraAngleX * DEG2RAD;
-
-  // In Roblox-style movement:
-  // - Camera is positioned at angle cameraAngleX around the player
-  // - Forward direction is FROM camera position TOWARDS player (negative of
-  // camera offset)
-  // - Camera offset is: X = sin(angle), Z = cos(angle)
-  // - So forward direction is: X = -sin(angle), Z = -cos(angle)
-
-  float forwardX = -sinf(cameraRad);  // Direction towards where camera looks
-  float forwardZ = -cosf(cameraRad);
-
-  // Right direction is perpendicular to forward (90 degrees rotation)
-  float rightX =
-      cosf(cameraRad);  // Corrected: positive for proper right direction
-  float rightZ =
-      -sinf(cameraRad);  // Corrected: negative for proper right direction
-
-  // Calculate movement relative to camera direction (Roblox-style)
-  movement.x = inputZ * forwardX + inputX * rightX;
-  movement.z = inputZ * forwardZ + inputX * rightZ;
-
-  // Jump input
-  if (IsKeyPressed(KEY_SPACE)) {
-    jump();
-  }
-
-  // Apply movement
-  if (Vector3Length(movement) > 0.1f) {
-    movement = Vector3Normalize(movement);
-    applyMovementForces(movement, movementSpeed);
-  }
+void HumanoidCharacter::applyMovement(const Vector3& direction, float speed,
+                                      float forceMultiplier) {
+  applyMovementInternal(direction, speed, forceMultiplier);
 }
 
-void HumanoidCharacter::applyMovementForces(Vector3 movement, float speed) {
+void HumanoidCharacter::applyMovementInternal(Vector3 movement, float speed,
+                                              float forceMultiplier) {
   if (!characterBody) return;
 
   btVector3 currentVelocity = characterBody->getLinearVelocity();
@@ -481,89 +433,11 @@ void HumanoidCharacter::applyMovementForces(Vector3 movement, float speed) {
     // STOP IMMEDIATELY - set horizontal velocity to zero
     btVector3 stopVelocity(0.0f, currentVelocity.getY(), 0.0f);
     characterBody->setLinearVelocity(stopVelocity);
-    return;
-  }
-
-  // Better movement with collision sliding - preserve Y velocity for jumping
-  btVector3 targetVelocity(movement.x * speed, currentVelocity.getY(),
-                           movement.z * speed);
-
-  // Apply movement force instead of setting velocity directly for better
-  // collision response
-  btVector3 velocityDiff = targetVelocity - currentVelocity;
-  velocityDiff.setY(0);  // Don't interfere with jumping/gravity
-
-  // Apply movement impulse for better collision handling and sliding
-  btVector3 movementImpulse =
-      velocityDiff * GameSettings::Character::MASS * 0.1f;
-  characterBody->applyCentralImpulse(movementImpulse);
-
-  // Limit maximum horizontal speed to prevent sliding
-  btVector3 vel = characterBody->getLinearVelocity();
-  float horizontalSpeed =
-      sqrt(vel.getX() * vel.getX() + vel.getZ() * vel.getZ());
-  if (horizontalSpeed > speed) {
-    float scale = speed / horizontalSpeed;
-    characterBody->setLinearVelocity(
-        btVector3(vel.getX() * scale, vel.getY(), vel.getZ() * scale));
-  }
-
-  // Smooth rotation towards movement direction - PHYSICS-FRIENDLY approach
-  if (Vector3Length(movement) > 0.1f) {
-    float targetRotation = atan2(movement.x, movement.z);
-
-    // Get current rotation
-    btTransform transform;
-    characterBody->getMotionState()->getWorldTransform(transform);
-    btQuaternion currentRotation = transform.getRotation();
-
-    // Extract current Y rotation
-    float currentYRotation =
-        atan2(2.0f * (currentRotation.getW() * currentRotation.getY() +
-                      currentRotation.getX() * currentRotation.getZ()),
-              1.0f - 2.0f * (currentRotation.getY() * currentRotation.getY() +
-                             currentRotation.getZ() * currentRotation.getZ()));
-
-    float angleDiff = targetRotation - currentYRotation;
-
-    while (angleDiff > M_PI) angleDiff -= 2 * M_PI;
-    while (angleDiff < -M_PI) angleDiff += 2 * M_PI;
-
-    // Fast but gradual rotation - smooth and controlled
-    float rotationSpeed = GameSettings::Character::TURN_SPEED *
-                          0.05f;  // Smoother rotation to prevent stuttering
-
-    // Apply rotation as angular velocity instead of direct transform - smoother
-    // physics
-    if (abs(angleDiff) >
-        0.01f) {  // Only apply if there's meaningful difference
-      float targetAngularVelocity =
-          angleDiff * rotationSpeed * 60.0f;  // Scale for smooth rotation
-      characterBody->setAngularVelocity(btVector3(0, targetAngularVelocity, 0));
-    } else {
-      // Close enough - stop rotation
-      characterBody->setAngularVelocity(btVector3(0, 0, 0));
-    }
-  } else {
-    // No movement - stop rotation
     characterBody->setAngularVelocity(btVector3(0, 0, 0));
-  }
-}
-
-void HumanoidCharacter::applyEnhancedMovementForces(Vector3 movement,
-                                                    float speed,
-                                                    float forceMultiplier) {
-  if (!characterBody) return;
-
-  btVector3 currentVelocity = characterBody->getLinearVelocity();
-
-  // INSTANT STOP when no input - NO MORE SLIDING!
-  if (Vector3Length(movement) < 0.01f) {
-    // STOP IMMEDIATELY - set horizontal velocity to zero
-    btVector3 stopVelocity(0.0f, currentVelocity.getY(), 0.0f);
-    characterBody->setLinearVelocity(stopVelocity);
     return;
   }
+
+  movement = Vector3Normalize(movement);
 
   // Better movement with collision sliding - preserve Y velocity for jumping
   btVector3 targetVelocity(movement.x * speed, currentVelocity.getY(),
@@ -589,46 +463,46 @@ void HumanoidCharacter::applyEnhancedMovementForces(Vector3 movement,
         btVector3(vel.getX() * scale, vel.getY(), vel.getZ() * scale));
   }
 
-  // Smooth rotation towards movement direction - PHYSICS-FRIENDLY approach
-  if (Vector3Length(movement) > 0.1f) {
-    float targetRotation = atan2(movement.x, movement.z);
+  updateRotationTowardsMovement(movement);
+}
 
-    // Get current rotation
-    btTransform transform;
-    characterBody->getMotionState()->getWorldTransform(transform);
-    btQuaternion currentRotation = transform.getRotation();
+void HumanoidCharacter::updateRotationTowardsMovement(Vector3 movement) {
+  if (!characterBody) return;
 
-    // Extract current Y rotation
-    float currentYRotation =
-        atan2(2.0f * (currentRotation.getW() * currentRotation.getY() +
-                      currentRotation.getX() * currentRotation.getZ()),
-              1.0f - 2.0f * (currentRotation.getY() * currentRotation.getY() +
-                             currentRotation.getZ() * currentRotation.getZ()));
+  if (Vector3Length(movement) <= 0.1f) {
+    characterBody->setAngularVelocity(btVector3(0, 0, 0));
+    return;
+  }
 
-    float angleDiff = targetRotation - currentYRotation;
+  float targetRotation = atan2(movement.x, movement.z);
 
-    while (angleDiff > M_PI) angleDiff -= 2 * M_PI;
-    while (angleDiff < -M_PI) angleDiff += 2 * M_PI;
+  btTransform transform;
+  characterBody->getMotionState()->getWorldTransform(transform);
+  btQuaternion currentRotation = transform.getRotation();
 
-    // Fast but gradual rotation - smooth and controlled
-    float rotationSpeed = GameSettings::Character::TURN_SPEED *
-                          0.05f;  // Smoother rotation to prevent stuttering
+  float currentYRotation =
+      atan2(2.0f * (currentRotation.getW() * currentRotation.getY() +
+                    currentRotation.getX() * currentRotation.getZ()),
+            1.0f - 2.0f * (currentRotation.getY() * currentRotation.getY() +
+                           currentRotation.getZ() * currentRotation.getZ()));
 
-    // Apply rotation as angular velocity instead of direct transform - smoother
-    // physics
-    if (abs(angleDiff) >
-        0.01f) {  // Only apply if there's meaningful difference
-      float targetAngularVelocity =
-          angleDiff * rotationSpeed * 60.0f;  // Scale for smooth rotation
-      characterBody->setAngularVelocity(btVector3(0, targetAngularVelocity, 0));
-    } else {
-      // Close enough - stop rotation
-      characterBody->setAngularVelocity(btVector3(0, 0, 0));
-    }
+  float angleDiff = targetRotation - currentYRotation;
+
+  while (angleDiff > M_PI) angleDiff -= 2 * M_PI;
+  while (angleDiff < -M_PI) angleDiff += 2 * M_PI;
+
+  const float rotationSpeed = GameSettings::Character::TURN_SPEED * 0.05f;
+
+  if (std::fabs(angleDiff) > 0.01f) {
+    float targetAngularVelocity = angleDiff * rotationSpeed * 60.0f;
+    characterBody->setAngularVelocity(btVector3(0, targetAngularVelocity, 0));
   } else {
-    // No movement - stop rotation
     characterBody->setAngularVelocity(btVector3(0, 0, 0));
   }
+}
+
+void HumanoidCharacter::onRemovedFromWorld(GameWorld& world) {
+  removeFromPhysics(world.getDynamicsWorld());
 }
 
 void HumanoidCharacter::moveTowards(Vector3 target, float deltaTime) {
@@ -639,7 +513,7 @@ void HumanoidCharacter::moveTowards(Vector3 target, float deltaTime) {
   float distance = Vector3Length(direction);
 
   if (distance < 0.5f) {
-    applyMovementForces({0, 0, 0}, 0);
+    applyMovement({0, 0, 0}, 0.0f);
     return;
   }
 
@@ -647,7 +521,7 @@ void HumanoidCharacter::moveTowards(Vector3 target, float deltaTime) {
   direction = Vector3Normalize(direction);
   float speed = GameSettings::Character::MOVEMENT_SPEED;
 
-  applyMovementForces(direction, speed);
+  applyMovement(direction, speed);
 }
 
 void HumanoidCharacter::jump() {
@@ -1027,3 +901,11 @@ void HumanoidCharacter::constrainBodyPartsToCharacter() {
 std::unique_ptr<GameObject> HumanoidCharacter::clone() const {
   return std::make_unique<HumanoidCharacter>(*this);
 }
+
+PhysicsBodyConfig HumanoidCharacter::getPhysicsConfig() const {
+  PhysicsBodyConfig config;
+  config.usesPhysics = false;
+  return config;
+}
+
+void HumanoidCharacter::configurePhysicsBody(btRigidBody&) const {}

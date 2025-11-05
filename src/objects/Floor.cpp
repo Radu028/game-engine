@@ -1,7 +1,10 @@
 #include "objects/Floor.h"
 
+#include <btBulletDynamicsCommon.h>
+
 #include <string>
 
+#include "physics/PhysicsTypes.h"
 #include "systems/ShaderSystem.h"
 
 Floor::Floor(Vector3 position, Vector3 dimensions, Color color,
@@ -58,4 +61,23 @@ BoundingBox Floor::getBoundingBox() const {
 
 std::unique_ptr<GameObject> Floor::clone() const {
   return std::make_unique<Floor>(*this);
+}
+
+PhysicsBodyConfig Floor::getPhysicsConfig() const {
+  PhysicsBodyConfig config;
+  config.usesPhysics = hasCollision;
+  config.collider = ColliderType::Box;
+  config.dimensions = dimensions;
+  config.isStatic = true;
+  config.affectedByGravity = false;
+  return config;
+}
+
+void Floor::configurePhysicsBody(btRigidBody& body) const {
+  body.setFriction(1.5f);
+  body.setRollingFriction(1.5f);
+  body.setSpinningFriction(1.5f);
+  body.setDamping(0.0f, 0.0f);
+  body.setCollisionFlags(body.getCollisionFlags() |
+                         btCollisionObject::CF_STATIC_OBJECT);
 }

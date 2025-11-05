@@ -1,7 +1,6 @@
-#ifndef CUBEOBJECT_H
-#define CUBEOBJECT_H
+#pragma once
 
-#include <memory>  // For std::shared_ptr
+#include <memory>
 #include <string>
 
 #include "objects/GameObject.h"
@@ -43,7 +42,8 @@ class CubeObject : public GameObject {
 
   void interact() override;
 
+  PhysicsBodyConfig getPhysicsConfig() const override;
+  void configurePhysicsBody(btRigidBody& body) const override;
+
   void setUseShaders(bool use) { useShaders = use; }
 };
-
-#endif

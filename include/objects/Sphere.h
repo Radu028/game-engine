@@ -17,5 +17,7 @@ class Sphere : public StaticWorldObject {
   void draw() const override;
   BoundingBox getBoundingBox() const override;
   std::unique_ptr<GameObject> clone() const override;
+  PhysicsBodyConfig getPhysicsConfig() const override;
+  void configurePhysicsBody(btRigidBody& body) const override;
   float getRadius() const { return radius; }
 };

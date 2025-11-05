@@ -11,6 +11,9 @@
 #include "shop/Fruit.h"
 #include "shop/Shop.h"
 
+class GameWorld;
+class btDiscreteDynamicsWorld;
+
 // Observer pattern for NPC events
 class NPCObserver {
  public:
@@ -21,9 +24,10 @@ class NPCObserver {
   virtual void onNPCEnteredShop(class NPC* npc) = 0;
 };
 
-// NPC class extending HumanoidCharacter with AI behavior
-class NPC : public HumanoidCharacter {
+// NPC controller that drives a humanoid character using composition
+class NPC {
  private:
+  std::shared_ptr<HumanoidCharacter> character_;
   std::unique_ptr<NPCState> currentState;
   std::shared_ptr<Shop> targetShop;
   std::vector<NPCObserver*> observers;
@@ -51,9 +55,15 @@ class NPC : public HumanoidCharacter {
   bool hasTriedAlternative;
 
  public:
-  NPC(Vector3 position, std::shared_ptr<Shop> shop,
-      GameWorld* world = nullptr);
-  ~NPC() override;
+  NPC(Vector3 position, std::shared_ptr<Shop> shop, GameWorld* world = nullptr);
+  ~NPC();
+
+  std::shared_ptr<HumanoidCharacter> getBody() const { return character_; }
+
+  Vector3 getPosition() const;
+  Vector3 getTorsoPosition() const;
+  Vector3 getFeetPosition() const;
+  BoundingBox getBoundingBox() const;
 
   // State management
   void changeState(std::unique_ptr<NPCState> newState);
@@ -63,7 +73,7 @@ class NPC : public HumanoidCharacter {
   }
 
   // AI behavior
-  void update(float deltaTime) override;
+  void update(float deltaTime);
   void moveTowards(Vector3 target, float deltaTime);
   bool isNearTarget(Vector3 target, float threshold = 1.0f) const;
 
@@ -95,8 +105,12 @@ class NPC : public HumanoidCharacter {
   void setActive(bool active) { isActive = active; }
   void setChatSystem(NPCChatSystem* chat) { chatSystem = chat; }
 
-  // Object identification for pathfinding
-  std::string getObstacleType() const override { return "npc"; }
+  void removeFromPhysics(btDiscreteDynamicsWorld* world);
+
+  bool wouldCollideAfterMovement(Vector3 direction, float distance) const;
+  float getVerticalCollisionContactTime(const Vector3& verticalMovement,
+                                        const GameWorld* world,
+                                        int maxIterations) const;
 
   // Chat system helpers
   void sayMessage(const std::string& context) const;

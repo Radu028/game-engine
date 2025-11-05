@@ -71,7 +71,7 @@ void NPCManager::spawnNPC() {
     newNPC->addObserver(this);
 
     if (GameWorld* world = GameWorld::getInstance()) {
-      world->addObject(newNPC);
+      world->addObject(newNPC->getBody());
     }
 
     totalNPCsSpawned++;
@@ -92,8 +92,7 @@ void NPCManager::removeInactiveNPCs() {
 
                          // Remove from game world
                          if (GameWorld* world = GameWorld::getInstance()) {
-                           npc->removeFromPhysics(world->getDynamicsWorld());
-                           world->removeObject(npc);
+                           world->removeObject(npc->getBody());
                          }
 
                          return true;
@@ -160,6 +159,9 @@ void NPCManager::cleanupNPCs() {
   for (auto& npc : activeNPCs) {
     npc->removeObserver(this);
     npc->setActive(false);
+    if (GameWorld* world = GameWorld::getInstance()) {
+      world->removeObject(npc->getBody());
+    }
   }
   activeNPCs.clear();
 }

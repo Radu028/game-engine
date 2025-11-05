@@ -1,5 +1,4 @@
-#ifndef FRUIT_H
-#define FRUIT_H
+#pragma once
 
 #include <string>
 
@@ -40,5 +39,3 @@ class Fruit {
 
   bool operator!=(const Fruit& other) const { return !(*this == other); }
 };
-
-#endif  // FRUIT_H

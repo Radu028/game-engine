@@ -1,6 +1,8 @@
 // HumanoidCharacter.h - Solid humanoid character controller (no ragdoll)
 #pragma once
 
+#include <btBulletDynamicsCommon.h>
+
 #include <memory>
 
 #include "BodyPart.h"
@@ -84,16 +86,19 @@ class HumanoidCharacter : public GameObject {
   void draw() const override;
   BoundingBox getBoundingBox() const override;
   std::unique_ptr<GameObject> clone() const override;
+  PhysicsBodyConfig getPhysicsConfig() const override;
+  void configurePhysicsBody(btRigidBody& body) const override;
+  void onRemovedFromWorld(GameWorld& world) override;
 
   std::string getObstacleType() const override { return "character"; }
 
   // Movement and control
-  void handleInput(float movementSpeed, float cameraAngleX = 0.0f);
   void jump();
+  void applyMovement(const Vector3& direction, float speed,
+                     float forceMultiplier = 1.0f);
 
   // Movement for AI (NPCs)
   void moveTowards(Vector3 target, float deltaTime);
-  void applyMovementForces(Vector3 movement, float speed);
 
   // Ground detection
   bool isOnGround() const;
@@ -125,12 +130,11 @@ class HumanoidCharacter : public GameObject {
 
   void setWorld(GameWorld* w) { world = w; }
 
- protected:
-  // Protected method for enhanced movement forces (for NPCs)
-  void applyEnhancedMovementForces(Vector3 movement, float speed,
-                                   float forceMultiplier = 1.0f);
-
  private:
+  void applyMovementInternal(Vector3 movement, float speed,
+                             float forceMultiplier);
+  void updateRotationTowardsMovement(Vector3 movement);
+
   // Main physics body for movement (torso-centered)
   btRigidBody* characterBody = nullptr;
   btCollisionShape* characterShape = nullptr;

@@ -3,15 +3,35 @@
 #include <algorithm>
 #include <cmath>
 #include <random>
+#include <utility>
 
 #include "ai/NPCStates.h"
 #include "raymath.h"
 
 std::shared_ptr<NavMesh> NPC::navMesh = nullptr;
 
+Vector3 NPC::getPosition() const {
+  return character_ ? character_->getPosition() : Vector3{0.0f, 0.0f, 0.0f};
+}
+
+Vector3 NPC::getTorsoPosition() const {
+  return character_ ? character_->getTorsoPosition()
+                    : Vector3{0.0f, 0.0f, 0.0f};
+}
+
+Vector3 NPC::getFeetPosition() const {
+  return character_ ? character_->getFeetPosition()
+                    : Vector3{0.0f, 0.0f, 0.0f};
+}
+
+BoundingBox NPC::getBoundingBox() const {
+  return character_ ? character_->getBoundingBox()
+                    : BoundingBox{{0, 0, 0}, {0, 0, 0}};
+}
+
 NPC::NPC(Vector3 position, std::shared_ptr<Shop> shop, GameWorld* world)
-    : HumanoidCharacter(position, world),
-      targetShop(shop),
+    : character_(std::make_shared<HumanoidCharacter>(position, world)),
+      targetShop(std::move(shop)),
       chatSystem(nullptr),
       movementSpeed(3.0f),
       detectionRadius(5.0f),
@@ -61,11 +81,11 @@ void NPC::initializeNPC() {
                     static_cast<unsigned char>(legColorVec.y * 255),
                     static_cast<unsigned char>(legColorVec.z * 255), 255};
 
-  getTorso().visual.setColor(torsoColor);
-  getLeftArm().visual.setColor(armColor);
-  getRightArm().visual.setColor(armColor);
-  getLeftLeg().visual.setColor(legColor);
-  getRightLeg().visual.setColor(legColor);
+  character_->getTorso().visual.setColor(torsoColor);
+  character_->getLeftArm().visual.setColor(armColor);
+  character_->getRightArm().visual.setColor(armColor);
+  character_->getLeftLeg().visual.setColor(legColor);
+  character_->getRightLeg().visual.setColor(legColor);
 }
 
 void NPC::changeState(std::unique_ptr<NPCState> newState) {
@@ -84,8 +104,6 @@ void NPC::update(float deltaTime) {
   if (!isActive) {
     return;
   }
-
-  HumanoidCharacter::update(deltaTime);
 
   updateLifetime(deltaTime);
 
@@ -136,8 +154,8 @@ void NPC::moveTowards(Vector3 target, float deltaTime) {
       }
     }
 
-    applyEnhancedMovementForces({direction.x, 0, direction.z}, movementSpeed,
-                                5.0f);
+    character_->applyMovement({direction.x, 0.0f, direction.z}, movementSpeed,
+                              5.0f);
   }
 }
 
@@ -395,6 +413,24 @@ void NPC::sayMessage(const std::string& context) const {
 }
 
 void NPC::updateLifetime(float deltaTime) { lifetimeTimer += deltaTime; }
+
+void NPC::removeFromPhysics(btDiscreteDynamicsWorld* world) {
+  if (!character_) return;
+  character_->removeFromPhysics(world);
+}
+
+bool NPC::wouldCollideAfterMovement(Vector3 direction, float distance) const {
+  if (!character_) return false;
+  return character_->wouldCollideAfterMovement(direction, distance);
+}
+
+float NPC::getVerticalCollisionContactTime(const Vector3& verticalMovement,
+                                           const GameWorld* world,
+                                           int maxIterations) const {
+  if (!character_) return 0.0f;
+  return character_->getVerticalCollisionContactTime(verticalMovement, world,
+                                                     maxIterations);
+}
 
 Vector3 NPC::calculateRandomColor() const {
   static std::random_device rd;

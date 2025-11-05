@@ -1,13 +1,12 @@
-#ifndef GAMEOBJECT_H
-#define GAMEOBJECT_H
+#pragma once
 
-#include <btBulletDynamicsCommon.h>
+#include <memory>
+#include <string>
 
-#include <memory>  // For std::shared_ptr
-
-#include "GameWorld.h"
+#include "physics/PhysicsTypes.h"
 #include "raylib.h"
 
+class btRigidBody;
 class GameWorld;
 
 class GameObject {
@@ -18,7 +17,7 @@ class GameObject {
   bool affectedByGravity;
   bool isStatic;
   bool hasCollision;
-  btRigidBody* bulletBody = nullptr;  // Bullet physics rigid body pointer
+  btRigidBody* bulletBody = nullptr;
 
  public:
   GameObject(Vector3 position, bool hasCollision = true,
@@ -50,7 +49,7 @@ class GameObject {
       return {bbox.max.x - bbox.min.x, bbox.max.y - bbox.min.y,
               bbox.max.z - bbox.min.z};
     } catch (...) {
-      return {2.0f, 2.0f, 2.0f};  // Default size
+      return {2.0f, 2.0f, 2.0f};
     }
   }
 
@@ -61,9 +60,11 @@ class GameObject {
       const Vector3& verticalMovementVector, const GameWorld* world,
       int maxIterations) const;
 
+  virtual PhysicsBodyConfig getPhysicsConfig() const;
+  virtual void configurePhysicsBody(btRigidBody& body) const;
+  virtual void onRemovedFromWorld(GameWorld& world);
+
   bool checkCollision(const GameObject& other) const;
   float getDistance(const GameObject& other) const;
   float getDistanceSquared(const GameObject& other) const;
 };
-
-#endif

@@ -1,10 +1,10 @@
 #include "objects/GameObject.h"
 
-#include <btBulletDynamicsCommon.h>
-
 #include <cmath>
 
 #include "GameWorld.h"
+#include "physics/PhysicsTypes.h"
+#include "btBulletDynamicsCommon.h"
 #include "raymath.h"
 
 GameObject::GameObject(Vector3 position, bool hasCollision,
@@ -44,6 +44,14 @@ float GameObject::getDistanceSquared(const GameObject& other) const {
   float dz = other.position.z - this->position.z;
   return dx * dx + dy * dy + dz * dz;
 }
+
+PhysicsBodyConfig GameObject::getPhysicsConfig() const {
+  return PhysicsBodyConfig{};
+}
+
+void GameObject::configurePhysicsBody(btRigidBody&) const {}
+
+void GameObject::onRemovedFromWorld(GameWorld&) {}
 
 float GameObject::getVerticalCollisionContactTime(
     const Vector3& verticalMovementVector, const GameWorld* world,

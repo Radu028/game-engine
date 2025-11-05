@@ -1,8 +1,11 @@
 #include "objects/CubeObject.h"
 
+#include <btBulletDynamicsCommon.h>
+
 #include <memory>
 #include <string>
 
+#include "physics/PhysicsTypes.h"
 #include "systems/ShaderSystem.h"
 
 CubeObject::CubeObject(Vector3 position, Vector3 size, Color color,
@@ -115,4 +118,33 @@ void CubeObject::interact() {}
 
 std::unique_ptr<GameObject> CubeObject::clone() const {
   return std::make_unique<CubeObject>(*this);
+}
+
+PhysicsBodyConfig CubeObject::getPhysicsConfig() const {
+  PhysicsBodyConfig config;
+  config.usesPhysics = hasCollision;
+  config.collider = ColliderType::Box;
+  config.dimensions = size;
+  config.isStatic = isStatic;
+  config.affectedByGravity = affectedByGravity;
+  return config;
+}
+
+void CubeObject::configurePhysicsBody(btRigidBody& body) const {
+  body.setActivationState(DISABLE_DEACTIVATION);
+
+  if (isStatic) {
+    body.setFriction(1.5f);
+    body.setRollingFriction(1.5f);
+    body.setSpinningFriction(1.5f);
+    body.setDamping(0.0f, 0.0f);
+    body.setCollisionFlags(body.getCollisionFlags() |
+                           btCollisionObject::CF_STATIC_OBJECT);
+    return;
+  }
+
+  body.setFriction(2.0f);
+  body.setRollingFriction(2.0f);
+  body.setSpinningFriction(2.0f);
+  body.setDamping(0.8f, 0.8f);
 }
