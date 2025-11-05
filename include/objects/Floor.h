@@ -13,11 +13,9 @@ class Floor : public StaticWorldObject {
   bool hasTexture;
   Model model;
 
-  bool useShaders;
-
  public:
   Floor(Vector3 position, Vector3 dimensions, Color color,
-        bool hasCollision = true, bool useShaders = true);
+        bool hasCollision = true);
   Floor(Vector3 position, Vector3 dimensions, std::string texturePath,
         bool hasCollision = true);
 

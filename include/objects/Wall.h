@@ -8,11 +8,10 @@ class Wall : public StaticWorldObject {
   Color color;
 
   Model model;
-  bool useShaders;
 
  public:
   Wall(Vector3 position, Vector3 dimensions, Color color,
-       bool hasCollisions = true, bool useShaders = true);
+       bool hasCollisions = true);
 
   void draw() const override;
   BoundingBox getBoundingBox() const override;

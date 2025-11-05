@@ -4,12 +4,10 @@
 #include "physics/PhysicsTypes.h"
 #include "systems/ShaderSystem.h"
 
-Wall::Wall(Vector3 position, Vector3 dimensions, Color color, bool hasCollision,
-           bool useShaders)
+Wall::Wall(Vector3 position, Vector3 dimensions, Color color, bool hasCollision)
     : StaticWorldObject(position, hasCollision),
       dimensions(dimensions),
-      color(color),
-      useShaders(useShaders) {
+      color(color) {
   model =
       LoadModelFromMesh(GenMeshCube(dimensions.x, dimensions.y, dimensions.z));
 
@@ -18,11 +16,7 @@ Wall::Wall(Vector3 position, Vector3 dimensions, Color color, bool hasCollision,
 }
 
 void Wall::draw() const {
-  if (useShaders) {
-    DrawModel(model, position, 1.0f, color);
-  } else {
-    DrawCube(position, dimensions.x, dimensions.y, dimensions.z, color);
-  }
+  DrawModel(model, position, 1.0f, color);
 }
 
 BoundingBox Wall::getBoundingBox() const {

@@ -17,13 +17,11 @@ class CubeObject : public GameObject {
   bool hasTexture;
   bool textureLoaded;
   Model model;
-  bool useShaders;
 
  public:
   CubeObject(Vector3 position, Vector3 size, Color color, bool hasCollision,
              const std::string& texturePath = "",
-             bool affectedByGravity = false, bool isStatic = true,
-             bool useShaders = true);
+             bool affectedByGravity = false, bool isStatic = true);
   ~CubeObject() override;
 
   CubeObject(const CubeObject& other);
@@ -44,6 +42,4 @@ class CubeObject : public GameObject {
 
   PhysicsBodyConfig getPhysicsConfig() const override;
   void configurePhysicsBody(btRigidBody& body) const override;
-
-  void setUseShaders(bool use) { useShaders = use; }
 };

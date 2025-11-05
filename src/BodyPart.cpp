@@ -6,26 +6,35 @@
 #include "raylib.h"
 #include "systems/ShaderSystem.h"
 
+static Model MakeSharedModel() {
+  Mesh mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
+  Model model = LoadModelFromMesh(mesh);
+
+  if (ShaderSystem* shaderSystem = ShaderSystem::getInstance()) {
+    model.materials[0].shader = shaderSystem->getShader();
+  }
+
+  return model;
+}
+
+static Model& GetSharedModel() {
+  static Model sharedModel = MakeSharedModel();
+  return sharedModel;
+}
+
 BodyPart::BodyPart(Vector3 position, Vector3 size, Color color,
-                   bool hasCollision, bool useShaders)
+                   bool hasCollision)
     : GameObject(position, hasCollision, false, false),
       size(size),
       color(color),
       rotationAxis({0.0f, 1.0f, 0.0f}),
       rotationAngle(0.0f),
-      useShaders(useShaders),
+      model(&GetSharedModel()),
       name("Body Part"),
       health(100.0f),
       maxHealth(100.0f),
       isInjured(false),
-      injuryType("") {
-  model = LoadModelFromMesh(GenMeshCube(size.x, size.y, size.z));
-
-  if (useShaders) {
-    ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-    model.materials[0].shader = shaderSystem->getShader();
-  }
-}
+      injuryType("") {}
 
 BodyPart::BodyPart(const BodyPart& other)
     : GameObject(other),
@@ -33,18 +42,13 @@ BodyPart::BodyPart(const BodyPart& other)
       color(other.color),
       rotationAxis(other.rotationAxis),
       rotationAngle(other.rotationAngle),
-      useShaders(other.useShaders),
+      model(other.model),
       name(other.name),
       health(other.health),
       maxHealth(other.maxHealth),
       isInjured(other.isInjured),
       injuryType(other.injuryType) {
   std::cout << "BodyPart copy constructor called for: " << name << std::endl;
-  model = LoadModelFromMesh(GenMeshCube(size.x, size.y, size.z));
-  if (useShaders) {
-    ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-    model.materials[0].shader = shaderSystem->getShader();
-  }
 }
 
 BodyPart& BodyPart::operator=(const BodyPart& other) {
@@ -62,21 +66,17 @@ BodyPart::BodyPart(BodyPart&& other) noexcept
       color(other.color),
       rotationAxis(other.rotationAxis),
       rotationAngle(other.rotationAngle),
-      useShaders(other.useShaders),
+      model(other.model),
       name(std::move(other.name)),
       health(other.health),
       maxHealth(other.maxHealth),
       isInjured(other.isInjured),
       injuryType(std::move(other.injuryType)) {
   std::cout << "BodyPart move constructor called" << std::endl;
-
-  model = other.model;
-  other.model = {};
-
-  other.health = 0.0f;
   other.health = 0.0f;
   other.maxHealth = 0.0f;
   other.isInjured = false;
+  other.model = &GetSharedModel();
 }
 
 BodyPart& BodyPart::operator=(BodyPart&& other) noexcept {
@@ -86,29 +86,22 @@ BodyPart& BodyPart::operator=(BodyPart&& other) noexcept {
     color = other.color;
     rotationAxis = other.rotationAxis;
     rotationAngle = other.rotationAngle;
-    useShaders = other.useShaders;
     name = std::move(other.name);
     health = other.health;
     maxHealth = other.maxHealth;
     isInjured = other.isInjured;
     injuryType = std::move(other.injuryType);
-
-    if (model.meshCount > 0) UnloadModel(model);
     model = other.model;
-    other.model = {};
 
     other.health = 0.0f;
     other.maxHealth = 0.0f;
     other.isInjured = false;
+    other.model = &GetSharedModel();
   }
   return *this;
 }
 
-BodyPart::~BodyPart() {
-  if (model.meshCount > 0) {
-    UnloadModel(model);
-  }
-}
+BodyPart::~BodyPart() = default;
 
 void swap(BodyPart& first, BodyPart& second) noexcept {
   using std::swap;
@@ -116,7 +109,6 @@ void swap(BodyPart& first, BodyPart& second) noexcept {
   swap(first.color, second.color);
   swap(first.rotationAxis, second.rotationAxis);
   swap(first.rotationAngle, second.rotationAngle);
-  swap(first.useShaders, second.useShaders);
   swap(first.model, second.model);
   swap(first.name, second.name);
   swap(first.health, second.health);
@@ -141,13 +133,7 @@ float BodyPart::getRotationAngle() const { return rotationAngle; }
 Vector3 BodyPart::getRotationAxis() const { return rotationAxis; }
 
 void BodyPart::draw() const {
-  if (useShaders) {
-    DrawModelEx(model, position, rotationAxis, rotationAngle,
-                {1.0f, 1.0f, 1.0f}, color);
-  } else {
-    DrawModelEx(model, position, rotationAxis, rotationAngle,
-                {1.0f, 1.0f, 1.0f}, color);
-  }
+  DrawModelEx(*model, position, rotationAxis, rotationAngle, size, color);
 }
 
 BoundingBox BodyPart::getBoundingBox() const {
@@ -196,29 +182,4 @@ void BodyPart::displayStatus() const {
     std::cout << " (" << injuryType << ")";
   }
   std::cout << std::endl;
-}
-
-// Demonstration function for copy operations
-void demonstrateBodyPartCopyOperations() {
-  std::cout << "\n=== BodyPart Copy Operations Demonstration ===" << std::endl;
-
-  BodyPart original({0, 0, 0}, {1, 1, 1}, RED, false, false);
-  original.setName("Left Arm");
-  original.setHealth(80.0f, 100.0f);
-  original.takeDamage(30.0f);
-  std::cout << "Original: ";
-  original.displayStatus();
-
-  BodyPart copied(original);
-  std::cout << "Copied: ";
-  copied.displayStatus();
-
-  BodyPart assigned({1, 1, 1}, {1, 1, 1}, BLUE, false, false);
-  assigned.setName("Right Leg");
-  assigned.setHealth(100.0f, 100.0f);
-  assigned = original;
-  std::cout << "Assigned: ";
-  assigned.displayStatus();
-
-  std::cout << "=============================================" << std::endl;
 }

@@ -10,13 +10,15 @@
 
 CubeObject::CubeObject(Vector3 position, Vector3 size, Color color,
                        bool hasCollision, const std::string& texturePath,
-                       bool affectedByGravity, bool isStatic, bool useShaders)
+                       bool affectedByGravity, bool isStatic)
     : GameObject(position, hasCollision, affectedByGravity, isStatic),
       size(size),
       color(color),
+      hasTexture(false),
       textureLoaded(false),
-      useShaders(useShaders) {
-  model = LoadModelFromMesh(GenMeshCube(size.x, size.y, size.z));
+      model(LoadModelFromMesh(GenMeshCube(size.x, size.y, size.z))) {
+  ShaderSystem* shaderSystem = ShaderSystem::getInstance();
+  model.materials[0].shader = shaderSystem->getShader();
 
   if (!texturePath.empty()) {
     texture = LoadTexture(texturePath.c_str());
@@ -28,12 +30,6 @@ CubeObject::CubeObject(Vector3 position, Vector3 size, Color color,
       TraceLog(LOG_WARNING, "Failed to load texture: %s", texturePath.c_str());
     }
   }
-
-  // If using shaders, assign the lighting shader to the model material
-  if (useShaders) {
-    ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-    model.materials[0].shader = shaderSystem->getShader();
-  }
 }
 
 CubeObject::CubeObject(const CubeObject& other)
@@ -42,18 +38,14 @@ CubeObject::CubeObject(const CubeObject& other)
       size(other.size),
       color(other.color),
       hasTexture(other.hasTexture),
-      useShaders(other.useShaders) {
-  model = LoadModelFromMesh(GenMeshCube(size.x, size.y, size.z));
+      textureLoaded(other.textureLoaded),
+      model(LoadModelFromMesh(GenMeshCube(size.x, size.y, size.z))) {
+  ShaderSystem* shaderSystem = ShaderSystem::getInstance();
+  model.materials[0].shader = shaderSystem->getShader();
 
   if (hasTexture) {
     texture = other.texture;
     model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
-  }
-
-  // If using shaders, assign the lighting shader to the model material
-  if (useShaders) {
-    ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-    model.materials[0].shader = shaderSystem->getShader();
   }
 }
 
@@ -79,19 +71,8 @@ BoundingBox CubeObject::getBoundingBox() const {
 }
 
 void CubeObject::draw() const {
-  if (useShaders && hasTexture) {
-    // With shaders and texture, the material already has the shader assigned
-    DrawModel(model, position, 1.0f, WHITE);
-  } else if (useShaders) {
-    // With shaders but no texture, use the model with color
-    DrawModel(model, position, 1.0f, color);
-  } else if (hasTexture) {
-    // Fallback to normal rendering with texture
-    DrawModel(model, position, 1.0f, WHITE);
-  } else {
-    // Fallback to simple cube rendering
-    DrawCube(position, size.x, size.y, size.z, color);
-  }
+  Color tint = hasTexture ? WHITE : color;
+  DrawModel(model, position, 1.0f, tint);
 
 #ifdef DEBUG_WIREFRAMES
   Color wireColor = RED;

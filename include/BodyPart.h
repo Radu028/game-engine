@@ -14,8 +14,7 @@ class BodyPart : public GameObject {
   Vector3 rotationAxis;
   float rotationAngle;
 
-  Model model;
-  bool useShaders;
+  Model* model;
 
   // Health-related members for academic requirements
   std::string name;
@@ -26,7 +25,7 @@ class BodyPart : public GameObject {
 
  public:
   BodyPart(Vector3 position, Vector3 size, Color color,
-           bool hasCollision = true, bool useShaders = true);
+           bool hasCollision = true);
 
   BodyPart(const BodyPart& other);
 
@@ -49,8 +48,6 @@ class BodyPart : public GameObject {
 
   float getRotationAngle() const;
   Vector3 getRotationAxis() const;
-
-  void setUseShaders(bool use) { useShaders = use; }
 
   void draw() const override;
   BoundingBox getBoundingBox() const override;

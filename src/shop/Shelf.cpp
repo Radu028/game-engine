@@ -6,7 +6,7 @@
 #include "raymath.h"
 
 Shelf::Shelf(Vector3 position, Vector3 size, Color color)
-    : CubeObject(position, size, color, true, "", false, true, true),
+    : CubeObject(position, size, color, true, "", false, true),
       shelfPosition(position),
       maxFruits(8),
       fruitSpacing(0.3f) {}

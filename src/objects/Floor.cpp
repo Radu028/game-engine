@@ -8,26 +8,29 @@
 #include "systems/ShaderSystem.h"
 
 Floor::Floor(Vector3 position, Vector3 dimensions, Color color,
-             bool hasCollision, bool useShaders)
+             bool hasCollision)
     : StaticWorldObject(position, hasCollision),
       dimensions(dimensions),
       color(color),
-      hasTexture(false),
-      useShaders(useShaders) {
-  if (useShaders) {
-    model = LoadModelFromMesh(
-        GenMeshCube(dimensions.x, dimensions.y, dimensions.z));
+      hasTexture(false) {
+  model = LoadModelFromMesh(
+      GenMeshCube(dimensions.x, dimensions.y, dimensions.z));
 
-    ShaderSystem* shaderSystem = ShaderSystem::getInstance();
-    model.materials[0].shader = shaderSystem->getShader();
-  }
+  ShaderSystem* shaderSystem = ShaderSystem::getInstance();
+  model.materials[0].shader = shaderSystem->getShader();
 }
 
 Floor::Floor(Vector3 position, Vector3 dimensions, std::string texturePath,
              bool hasCollision)
-    : StaticWorldObject(position, true), dimensions(dimensions), color(WHITE) {
+    : StaticWorldObject(position, true),
+      dimensions(dimensions),
+      color(WHITE),
+      hasTexture(false) {
   model =
       LoadModelFromMesh(GenMeshCube(dimensions.x, dimensions.y, dimensions.z));
+
+  ShaderSystem* shaderSystem = ShaderSystem::getInstance();
+  model.materials[0].shader = shaderSystem->getShader();
 
   Texture2D texture = LoadTexture(texturePath.c_str());
   if (texture.id > 0) {
@@ -39,13 +42,8 @@ Floor::Floor(Vector3 position, Vector3 dimensions, std::string texturePath,
 }
 
 void Floor::draw() const {
-  if (hasTexture) {
-    DrawModel(model, position, 1.0f, WHITE);
-  } else if (useShaders) {
-    DrawModel(model, position, 1.0f, color);
-  } else {
-    DrawCube(position, dimensions.x, dimensions.y, dimensions.z, color);
-  }
+  Color tint = hasTexture ? WHITE : color;
+  DrawModel(model, position, 1.0f, tint);
 }
 
 BoundingBox Floor::getBoundingBox() const {

@@ -70,7 +70,7 @@ std::string Fruit::getFruitName(FruitType type) {
 
 Fruit::Fruit(Vector3 position, FruitType fruitType)
     : Sphere(position, getFruitRadius(fruitType), getFruitColor(fruitType),
-             true, false),
+             true),
       type(fruitType),
       price(getFruitPrice(fruitType)),
       isPicked(false),

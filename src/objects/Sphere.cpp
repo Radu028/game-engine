@@ -4,12 +4,10 @@
 #include "physics/PhysicsTypes.h"
 #include "systems/ShaderSystem.h"
 
-Sphere::Sphere(Vector3 position, float radius, Color color, bool hasCollisions,
-               bool useShaders)
+Sphere::Sphere(Vector3 position, float radius, Color color, bool hasCollisions)
     : StaticWorldObject(position, hasCollisions),
       radius(radius),
-      color(color),
-      useShaders(useShaders) {
+      color(color) {
   model = LoadModelFromMesh(GenMeshSphere(radius, 32, 32));
 
   ShaderSystem* shaderSystem = ShaderSystem::getInstance();
@@ -17,11 +15,7 @@ Sphere::Sphere(Vector3 position, float radius, Color color, bool hasCollisions,
 }
 
 void Sphere::draw() const {
-  if (useShaders) {
-    DrawModel(model, position, 1.0f, color);
-  } else {
-    DrawSphere(position, radius, color);
-  }
+  DrawModel(model, position, 1.0f, color);
 }
 
 BoundingBox Sphere::getBoundingBox() const {

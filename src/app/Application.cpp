@@ -101,7 +101,7 @@ void Application::initialize() {
 
   world->addObject(std::make_shared<Floor>(Vector3{0.0f, 0.0f, 0.0f},
                                            Vector3{50.0f, 1.0f, 50.0f},
-                                           DARKGREEN, true, true));
+                                           DARKGREEN, true));
 
   gameManager = GameManager::getInstance();
 }

@@ -8,11 +8,10 @@ class Sphere : public StaticWorldObject {
   Color color;
 
   Model model;
-  bool useShaders;
 
  public:
-  Sphere(Vector3 position, float radius, Color color, bool hasCollisions = true,
-         bool useShaders = true);
+  Sphere(Vector3 position, float radius, Color color,
+         bool hasCollisions = true);
 
   void draw() const override;
   BoundingBox getBoundingBox() const override;
