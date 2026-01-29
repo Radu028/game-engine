@@ -31,6 +31,10 @@ class Fruit : public Sphere {
   bool getIsPicked() const { return isPicked; }
   const std::string& getName() const { return name; }
 
+  // Fruits should not affect navigation/pathfinding.
+  std::string getObstacleType() const override { return "pickup"; }
+
+  void draw() const override;
   void pickFruit();
   void resetFruit();
 

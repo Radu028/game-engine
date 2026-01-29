@@ -67,10 +67,9 @@ class NavMesh {
   void generateNavMesh();
   void rebuildConnections();
 
-  // Professional object management system
+  // Object management system
   void registerObject(GameObject* object);
   void unregisterObject(GameObject* object);
-  void updateAllRegisteredObjects();
   void updateObjectBlocking(GameObject* object);
 
   // Advanced blocking calculation
@@ -78,11 +77,9 @@ class NavMesh {
   float calculateBlockingHeight(GameObject* object) const;
   void markObjectNodes(GameObject* object, bool walkable);
 
-  // Legacy obstacle management system (kept for compatibility)
+  // Obstacle management
   void addObstacle(Vector3 position, Vector3 size,
                    const std::string& type = "generic");
-  void addShelfObstacle(Vector3 shelfPos, Vector3 shelfSize);
-  void addWallObstacle(Vector3 wallPos, Vector3 wallSize);
   void removeObstacle(Vector3 position, Vector3 size);
   void markNodesInArea(Vector3 center, Vector3 size, bool walkable,
                        float expansionFactor = 0.5f);

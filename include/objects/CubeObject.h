@@ -13,9 +13,10 @@ class CubeObject : public GameObject {
   Vector3 size;
   Color color;
 
-  Texture2D texture;
+  Texture2D texture{};
   bool hasTexture;
   bool textureLoaded;
+  std::string texturePath_;
   Model model;
 
  public:

@@ -10,7 +10,10 @@ class Floor : public StaticWorldObject {
   Vector3 dimensions;
   Color color;
 
+  Texture2D texture{};
   bool hasTexture;
+  bool textureLoaded;
+  std::string texturePath_;
   Model model;
 
  public:
@@ -18,6 +21,12 @@ class Floor : public StaticWorldObject {
         bool hasCollision = true);
   Floor(Vector3 position, Vector3 dimensions, std::string texturePath,
         bool hasCollision = true);
+  ~Floor() override;
+
+  Floor(const Floor&) = delete;
+  Floor& operator=(const Floor&) = delete;
+  Floor(Floor&&) = delete;
+  Floor& operator=(Floor&&) = delete;
 
   void draw() const override;
   BoundingBox getBoundingBox() const override;

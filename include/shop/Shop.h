@@ -42,10 +42,7 @@ class Shop {
 
   void interact();
   void update(float deltaTime);
-  std::unique_ptr<GameObject> clone() const;
 
  private:
   void addWall(Vector3 position, Vector3 size, Color color = DARKBROWN);
-  Vector3 calculateInteriorBounds() const;
-  void finalizeNavMesh();
 };

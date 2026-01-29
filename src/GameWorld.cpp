@@ -26,10 +26,25 @@ GameWorld::GameWorld(const std::string& name) : worldName(name) {
 }
 
 GameWorld::~GameWorld() {
-  for (auto& object : objects) {
-    if (object) object->onRemovedFromWorld(*this);
+  // Ensure the global NPC NavMesh pointer doesn't keep our NavMesh alive after
+  // the world is destroyed.
+  NPC::setNavMesh(nullptr);
+
+  // Remove all objects through the regular path to guarantee:
+  // - physics bodies are removed while objects are still alive
+  // - navmesh registrations are undone deterministically
+  // - object-specific teardown (onRemovedFromWorld) is called once
+  //
+  // We iterate a copy because `removeObject()` mutates `objects`.
+  const auto objectsCopy = objects;
+  for (const auto& object : objectsCopy) {
+    removeObject(object);
   }
   objects.clear();
+
+  // Release subsystems explicitly (clarifies teardown order).
+  navigationMesh.reset();
+  physicsSystem.reset();
 
   if (instance == this) instance = nullptr;
 }
@@ -74,7 +89,6 @@ void GameWorld::update(float deltaTime) {
   }
 
   if (physicsSystem) physicsSystem->update(deltaTime);
-  if (navigationMesh) navigationMesh->updateAllRegisteredObjects();
 }
 
 void GameWorld::draw() const {

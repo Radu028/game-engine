@@ -9,7 +9,9 @@ namespace GameSettings {
 namespace Physics {
 static constexpr float GRAVITY_ACCELERATION =
     -30.0f;  // Gravity setting for less floaty jumps
-}
+static constexpr float FIXED_TIMESTEP = 1.0f / 60.0f;  // 60 FPS simulation
+static constexpr int MAX_SUBSTEPS = 10;  // Maximum physics substeps per frame
+}  // namespace Physics
 
 // Player/Character constants
 namespace Character {
@@ -150,4 +152,19 @@ inline float getGroundYFromPhysicsCenterY(float physicsCenterY) {
   return physicsCenterY - getHalfCapsuleHeight();
 }
 }  // namespace CharacterCalculations
+
+// NPC AI constants
+namespace NPC {
+static constexpr float LOOKING_AT_SHELF_TIME = 10.0f;
+static constexpr float CHAT_INTERVAL = 4.0f;
+static constexpr float ARRIVAL_THRESHOLD = 2.5f;
+static constexpr float MAX_SHOPPING_TIME = 90.0f;
+static constexpr float MAX_WANDER_TIME = 5.0f;
+static constexpr float LEAVE_PROBABILITY = 0.1f;
+static constexpr float STUCK_THRESHOLD = 0.02f;
+static constexpr float STUCK_TIMEOUT = 7.0f;
+static constexpr float EXIT_DISTANCE = 2.0f;
+static constexpr float SHOP_EXIT_DISTANCE = 15.0f;
+static constexpr int MIN_SHELVES_TO_VISIT = 2;
+}  // namespace NPC
 }  // namespace GameSettings

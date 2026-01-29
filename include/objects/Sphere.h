@@ -12,6 +12,12 @@ class Sphere : public StaticWorldObject {
  public:
   Sphere(Vector3 position, float radius, Color color,
          bool hasCollisions = true);
+  ~Sphere() override;
+
+  Sphere(const Sphere&) = delete;
+  Sphere& operator=(const Sphere&) = delete;
+  Sphere(Sphere&&) = delete;
+  Sphere& operator=(Sphere&&) = delete;
 
   void draw() const override;
   BoundingBox getBoundingBox() const override;

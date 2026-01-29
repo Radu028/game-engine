@@ -14,6 +14,8 @@ Sphere::Sphere(Vector3 position, float radius, Color color, bool hasCollisions)
   model.materials[0].shader = shaderSystem->getShader();
 }
 
+Sphere::~Sphere() { UnloadModel(model); }
+
 void Sphere::draw() const {
   DrawModel(model, position, 1.0f, color);
 }
@@ -27,7 +29,7 @@ BoundingBox Sphere::getBoundingBox() const {
 }
 
 std::unique_ptr<GameObject> Sphere::clone() const {
-  return std::make_unique<Sphere>(*this);
+  return std::make_unique<Sphere>(position, radius, color, hasCollision);
 }
 
 PhysicsBodyConfig Sphere::getPhysicsConfig() const {

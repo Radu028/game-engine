@@ -21,7 +21,11 @@ class ShaderSystem {
 
  public:
   static ShaderSystem* getInstance();
+  static void destroyInstance();
   ~ShaderSystem();
+
+  ShaderSystem(const ShaderSystem&) = delete;
+  ShaderSystem& operator=(const ShaderSystem&) = delete;
 
   void initialize();
   void cleanup();

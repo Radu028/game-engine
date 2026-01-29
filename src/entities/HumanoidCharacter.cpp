@@ -1,6 +1,8 @@
 // HumanoidCharacter.cpp - Solid humanoid character controller (no ragdoll)
 #include "entities/HumanoidCharacter.h"
 
+#include <btBulletDynamicsCommon.h>
+
 #include <cmath>
 
 #include "GameWorld.h"
@@ -8,26 +10,22 @@
 #include "raymath.h"
 #include "settings/Physics.h"
 
-int HumanoidCharacter::totalCharactersCreated = 0;
-int HumanoidCharacter::activeCharacters = 0;
+namespace {
+constexpr float kMoveInputDeadzone = 0.01f;
+constexpr float kRotateInputDeadzone = 0.1f;
+constexpr float kRotationEpsilonRad = 0.01f;
+constexpr float kMovementImpulseFactor = 0.1f;
+}  // namespace
 
-float HumanoidCharacter::calculateDistance(const HumanoidCharacter& char1,
-                                           const HumanoidCharacter& char2) {
-  Vector3 pos1 = char1.getPosition();
-  Vector3 pos2 = char2.getPosition();
-  return Vector3Distance(pos1, pos2);
-}
+HumanoidPhysicsPart::~HumanoidPhysicsPart() { cleanup(); }
 
-Vector3 HumanoidCharacter::getCharacterSpacing(int characterCount) {
-  if (characterCount <= 1) return {0.0f, 0.0f, 0.0f};
-  float spacing =
-      3.0f + (characterCount * 0.5f);  // Increase spacing with more characters
-  return {spacing, 0.0f, spacing};
-}
-
-bool HumanoidCharacter::areCharactersOverlapping(
-    const HumanoidCharacter& char1, const HumanoidCharacter& char2) {
-  return calculateDistance(char1, char2) < 2.0f;  // Less than 2 units apart
+void HumanoidPhysicsPart::cleanup() {
+  delete body;
+  delete shape;
+  delete motionState;
+  body = nullptr;
+  shape = nullptr;
+  motionState = nullptr;
 }
 
 HumanoidCharacter::HumanoidCharacter(Vector3 position, GameWorld* gameWorld)
@@ -110,9 +108,6 @@ HumanoidCharacter::HumanoidCharacter(Vector3 position, GameWorld* gameWorld)
           {0.12f,
            GameSettings::CharacterCalculations::getHeadBaseYOffset() + 0.15f,
            0.26f}) {
-  totalCharactersCreated++;
-  activeCharacters++;
-
   if (gameWorld) {
     setWorld(gameWorld);
     setupPhysics(gameWorld->getDynamicsWorld());
@@ -120,8 +115,6 @@ HumanoidCharacter::HumanoidCharacter(Vector3 position, GameWorld* gameWorld)
 }
 
 HumanoidCharacter::~HumanoidCharacter() {
-  activeCharacters--;
-
   if (physicsWorld && characterBody) {
     physicsWorld->removeRigidBody(characterBody);
   }
@@ -324,157 +317,105 @@ void HumanoidCharacter::animateCharacter(float deltaTime) {
 void HumanoidCharacter::updateVisualPositions() {
   if (!characterBody) return;
 
-  // Get physics body transform ONCE per frame - SINGLE SOURCE OF TRUTH
+  // Read the Bullet transform once per frame; all visuals derive from it.
   btTransform transform;
   characterBody->getMotionState()->getWorldTransform(transform);
-  btVector3 origin = transform.getOrigin();
-  Vector3 physicsPos = {origin.getX(), origin.getY(), origin.getZ()};
+  const btVector3 origin = transform.getOrigin();
+  const Vector3 bodyCenterPos = {origin.getX(), origin.getY(), origin.getZ()};
 
-  // Update main position once per frame (at feet level)
-  // Calculate ground position from physics body center
+  // `GameObject::position` represents the character's ground/feet position.
   position = {origin.getX(),
               GameSettings::CharacterCalculations::getGroundYFromPhysicsCenterY(
                   origin.getY()),
               origin.getZ()};
 
-  // Get rotation (only Y-axis rotation allowed)
-  btQuaternion rotation = transform.getRotation();
-  float yRotation = atan2(2.0f * (rotation.getW() * rotation.getY() +
-                                  rotation.getX() * rotation.getZ()),
-                          1.0f - 2.0f * (rotation.getY() * rotation.getY() +
-                                         rotation.getZ() * rotation.getZ()));
+  // Compute yaw (Y-axis rotation).
+  const btQuaternion rotation = transform.getRotation();
+  const float yawRad = atan2(2.0f * (rotation.getW() * rotation.getY() +
+                                     rotation.getX() * rotation.getZ()),
+                             1.0f - 2.0f * (rotation.getY() * rotation.getY() +
+                                            rotation.getZ() * rotation.getZ()));
 
-  // Convert rotation to degrees for BodyPart's setRotation method
-  float yRotationDegrees = yRotation * RAD2DEG;
+  // BodyPart expects degrees.
+  const float yawDeg = yawRad * RAD2DEG;
+  const Vector3 yawAxis = {0.0f, 1.0f, 0.0f};
 
-  // Update visual parts positions and rotations
-  Vector3 rotatedOffset;
+  auto placePart = [&](BodyPart& partVisual, const Vector3& localOffset) {
+    const Vector3 rotatedOffset =
+        Vector3RotateByAxisAngle(localOffset, yawAxis, yawRad);
+    partVisual.setPosition(Vector3Add(bodyCenterPos, rotatedOffset));
+    partVisual.setRotation(yawAxis, yawDeg);
+  };
 
-  // Head position and rotation
-  rotatedOffset =
-      Vector3RotateByAxisAngle(head.currentOffset, {0, 1, 0}, yRotation);
-  head.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  head.visual.setRotation({0, 1, 0}, yRotationDegrees);
+  placePart(head.visual, head.currentOffset);
+  placePart(torso.visual, torso.currentOffset);
+  placePart(leftArm.visual, leftArm.currentOffset);
+  placePart(rightArm.visual, rightArm.currentOffset);
+  placePart(leftLeg.visual, leftLeg.currentOffset);
+  placePart(rightLeg.visual, rightLeg.currentOffset);
 
-  // Torso position and rotation
-  rotatedOffset =
-      Vector3RotateByAxisAngle(torso.currentOffset, {0, 1, 0}, yRotation);
-  torso.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  torso.visual.setRotation({0, 1, 0}, yRotationDegrees);
-
-  // Left Arm position and rotation
-  rotatedOffset =
-      Vector3RotateByAxisAngle(leftArm.currentOffset, {0, 1, 0}, yRotation);
-  leftArm.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  leftArm.visual.setRotation({0, 1, 0}, yRotationDegrees);
-
-  // Right Arm position and rotation
-  rotatedOffset =
-      Vector3RotateByAxisAngle(rightArm.currentOffset, {0, 1, 0}, yRotation);
-  rightArm.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  rightArm.visual.setRotation({0, 1, 0}, yRotationDegrees);
-
-  // Left Leg position and rotation
-  rotatedOffset =
-      Vector3RotateByAxisAngle(leftLeg.currentOffset, {0, 1, 0}, yRotation);
-  leftLeg.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  leftLeg.visual.setRotation({0, 1, 0}, yRotationDegrees);
-
-  // Right Leg position and rotation
-  rotatedOffset =
-      Vector3RotateByAxisAngle(rightLeg.currentOffset, {0, 1, 0}, yRotation);
-  rightLeg.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  rightLeg.visual.setRotation({0, 1, 0}, yRotationDegrees);
-
-  // Facial features transform
-  rotatedOffset =
-      Vector3RotateByAxisAngle(leftEye.currentOffset, {0, 1, 0}, yRotation);
-  leftEye.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  leftEye.visual.setRotation({0, 1, 0}, yRotationDegrees);
-
-  rotatedOffset =
-      Vector3RotateByAxisAngle(rightEye.currentOffset, {0, 1, 0}, yRotation);
-  rightEye.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  rightEye.visual.setRotation({0, 1, 0}, yRotationDegrees);
-
-  rotatedOffset =
-      Vector3RotateByAxisAngle(mouth.currentOffset, {0, 1, 0}, yRotation);
-  mouth.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  mouth.visual.setRotation({0, 1, 0}, yRotationDegrees);
-
-  // Eyebrow positioning
-  rotatedOffset =
-      Vector3RotateByAxisAngle(leftEyebrow.currentOffset, {0, 1, 0}, yRotation);
-  leftEyebrow.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  leftEyebrow.visual.setRotation({0, 1, 0}, yRotationDegrees);
-
-  rotatedOffset = Vector3RotateByAxisAngle(rightEyebrow.currentOffset,
-                                           {0, 1, 0}, yRotation);
-  rightEyebrow.visual.setPosition(Vector3Add(physicsPos, rotatedOffset));
-  rightEyebrow.visual.setRotation({0, 1, 0}, yRotationDegrees);
+  placePart(leftEye.visual, leftEye.currentOffset);
+  placePart(rightEye.visual, rightEye.currentOffset);
+  placePart(mouth.visual, mouth.currentOffset);
+  placePart(leftEyebrow.visual, leftEyebrow.currentOffset);
+  placePart(rightEyebrow.visual, rightEyebrow.currentOffset);
 }
-
-// updateFacialFeatures() method removed - now integrated into
-// updateVisualPositions() for efficiency
 
 void HumanoidCharacter::applyMovement(const Vector3& direction, float speed,
                                       float forceMultiplier) {
   applyMovementInternal(direction, speed, forceMultiplier);
 }
 
-void HumanoidCharacter::applyMovementInternal(Vector3 movement, float speed,
+void HumanoidCharacter::applyMovementInternal(Vector3 direction, float speed,
                                               float forceMultiplier) {
   if (!characterBody) return;
 
-  btVector3 currentVelocity = characterBody->getLinearVelocity();
+  const btVector3 currentVelocity = characterBody->getLinearVelocity();
 
-  // INSTANT STOP when no input - NO MORE SLIDING!
-  if (Vector3Length(movement) < 0.01f) {
-    // STOP IMMEDIATELY - set horizontal velocity to zero
-    btVector3 stopVelocity(0.0f, currentVelocity.getY(), 0.0f);
+  // No input: stop horizontal movement to avoid drifting.
+  if (Vector3Length(direction) < kMoveInputDeadzone) {
+    const btVector3 stopVelocity(0.0f, currentVelocity.getY(), 0.0f);
     characterBody->setLinearVelocity(stopVelocity);
     characterBody->setAngularVelocity(btVector3(0, 0, 0));
     return;
   }
 
-  movement = Vector3Normalize(movement);
+  direction = Vector3Normalize(direction);
 
-  // Better movement with collision sliding - preserve Y velocity for jumping
-  btVector3 targetVelocity(movement.x * speed, currentVelocity.getY(),
-                           movement.z * speed);
+  // Preserve Y velocity for gravity/jumping; drive only horizontal motion.
+  const btVector3 targetVelocity(direction.x * speed, currentVelocity.getY(),
+                                 direction.z * speed);
 
-  // Apply movement force instead of setting velocity directly for better
-  // collision response
+  // Apply an impulse for smoother collision response (vs. hard-set velocity).
   btVector3 velocityDiff = targetVelocity - currentVelocity;
-  velocityDiff.setY(0);  // Don't interfere with jumping/gravity
+  velocityDiff.setY(0.0f);
 
-  // Apply enhanced movement impulse using the force multiplier
-  btVector3 movementImpulse =
-      velocityDiff * GameSettings::Character::MASS * 0.1f * forceMultiplier;
-  characterBody->applyCentralImpulse(movementImpulse);
+  const btVector3 impulse = velocityDiff * GameSettings::Character::MASS *
+                            kMovementImpulseFactor * forceMultiplier;
+  characterBody->applyCentralImpulse(impulse);
 
-  // Limit maximum horizontal speed to prevent sliding
+  // Clamp horizontal speed to requested speed.
   btVector3 vel = characterBody->getLinearVelocity();
-  float horizontalSpeed =
-      sqrt(vel.getX() * vel.getX() + vel.getZ() * vel.getZ());
+  const float horizontalSpeed =
+      std::sqrt(vel.getX() * vel.getX() + vel.getZ() * vel.getZ());
   if (horizontalSpeed > speed) {
-    float scale = speed / horizontalSpeed;
+    const float scale = speed / horizontalSpeed;
     characterBody->setLinearVelocity(
         btVector3(vel.getX() * scale, vel.getY(), vel.getZ() * scale));
   }
 
-  updateRotationTowardsMovement(movement);
+  updateRotationTowardsMovement(direction);
 }
 
-void HumanoidCharacter::updateRotationTowardsMovement(Vector3 movement) {
+void HumanoidCharacter::updateRotationTowardsMovement(Vector3 direction) {
   if (!characterBody) return;
 
-  if (Vector3Length(movement) <= 0.1f) {
+  if (Vector3Length(direction) <= kRotateInputDeadzone) {
     characterBody->setAngularVelocity(btVector3(0, 0, 0));
     return;
   }
 
-  float targetRotation = atan2(movement.x, movement.z);
+  const float targetRotation = atan2(direction.x, direction.z);
 
   btTransform transform;
   characterBody->getMotionState()->getWorldTransform(transform);
@@ -493,7 +434,7 @@ void HumanoidCharacter::updateRotationTowardsMovement(Vector3 movement) {
 
   const float rotationSpeed = GameSettings::Character::TURN_SPEED * 0.05f;
 
-  if (std::fabs(angleDiff) > 0.01f) {
+  if (std::fabs(angleDiff) > kRotationEpsilonRad) {
     float targetAngularVelocity = angleDiff * rotationSpeed * 60.0f;
     characterBody->setAngularVelocity(btVector3(0, targetAngularVelocity, 0));
   } else {
@@ -650,11 +591,20 @@ Vector3 HumanoidCharacter::getPartWorldPosition(
     const HumanoidVisualPart& part) const {
   Vector3 characterPos = getPosition();
 
+  if (!characterBody || !characterBody->getMotionState()) {
+    return Vector3Add(characterPos, part.currentOffset);
+  }
+
   // Get character rotation (yaw only for simplicity)
   btTransform transform;
   characterBody->getMotionState()->getWorldTransform(transform);
   btQuaternion rotation = transform.getRotation();
-  float yaw = rotation.getAngle() * rotation.getAxis().getY();
+
+  // Correct yaw extraction from quaternion
+  float yaw = atan2(2.0f * (rotation.getW() * rotation.getY() +
+                            rotation.getX() * rotation.getZ()),
+                    1.0f - 2.0f * (rotation.getY() * rotation.getY() +
+                                   rotation.getZ() * rotation.getZ()));
 
   // Apply rotation to the part's current offset
   float cosYaw = cos(yaw);
@@ -891,15 +841,26 @@ void HumanoidCharacter::removeAllPhysicsBodies() {
   }
 }
 
-void HumanoidCharacter::constrainBodyPartsToCharacter() {
-  // This method can be used to add constraints between body parts
-  // For now, we use kinematic bodies that follow the main character
-  // In future implementations, you could add spring constraints
-  // or other joint types to create more physics interactions
-}
-
 std::unique_ptr<GameObject> HumanoidCharacter::clone() const {
-  return std::make_unique<HumanoidCharacter>(*this);
+  // Create a new character instance rather than copying raw Bullet pointers.
+  // Copying this type would duplicate physics handles and cause double-free.
+  auto cloned = std::make_unique<HumanoidCharacter>(position, world);
+
+  // Preserve visual customization (colors).
+  cloned->torso.visual.setColor(torso.visual.getColor());
+  cloned->leftArm.visual.setColor(leftArm.visual.getColor());
+  cloned->rightArm.visual.setColor(rightArm.visual.getColor());
+  cloned->leftLeg.visual.setColor(leftLeg.visual.getColor());
+  cloned->rightLeg.visual.setColor(rightLeg.visual.getColor());
+  cloned->head.visual.setColor(head.visual.getColor());
+
+  cloned->leftEye.visual.setColor(leftEye.visual.getColor());
+  cloned->rightEye.visual.setColor(rightEye.visual.getColor());
+  cloned->mouth.visual.setColor(mouth.visual.getColor());
+  cloned->leftEyebrow.visual.setColor(leftEyebrow.visual.getColor());
+  cloned->rightEyebrow.visual.setColor(rightEyebrow.visual.getColor());
+
+  return cloned;
 }
 
 PhysicsBodyConfig HumanoidCharacter::getPhysicsConfig() const {

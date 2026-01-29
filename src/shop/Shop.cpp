@@ -134,18 +134,9 @@ void Shop::update(float deltaTime) {
 void Shop::addWall(Vector3 position, Vector3 size, Color color) {
   auto wall = std::make_shared<Wall>(position, size, color);
   walls.push_back(wall);
-}
 
-Vector3 Shop::calculateInteriorBounds() const {
-  return {
-      size.x - 2.0f,  // Leave space for walls
-      size.y - 1.0f,  // Leave space for floor/ceiling
-      size.z - 2.0f   // Leave space for walls
-  };
-}
-
-void Shop::finalizeNavMesh() {
+  // Add wall to GameWorld for physics and collision
   if (GameWorld* world = GameWorld::getInstance()) {
-    world->finalizeObstacles();
+    world->addObjectAsObstacleDeferred(wall);
   }
 }

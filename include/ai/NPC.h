@@ -38,6 +38,7 @@ class NPC {
   float detectionRadius;
   float interactionRadius;
   bool isActive;
+  bool exitNotified;
   float lifetimeTimer;
   float maxLifetime;
 

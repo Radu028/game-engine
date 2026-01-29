@@ -1,15 +1,17 @@
 // HumanoidCharacter.h - Solid humanoid character controller (no ragdoll)
 #pragma once
 
-#include <btBulletDynamicsCommon.h>
-
 #include <memory>
 
-#include "BodyPart.h"
+#include "entities/BodyPart.h"
 #include "objects/GameObject.h"
 #include "raylib.h"
 
 class GameWorld;
+class btRigidBody;
+class btCollisionShape;
+class btDefaultMotionState;
+class btDiscreteDynamicsWorld;
 
 // Character states for animation
 enum HumanoidState { IDLE, WALKING, JUMPING };
@@ -28,6 +30,8 @@ struct HumanoidVisualPart {
 
 // Physics body part with individual collision
 struct HumanoidPhysicsPart {
+  // Bullet types are intentionally referenced via forward-declared pointers
+  // in the header to keep this unit focused on gameplay/rendering concerns.
   btRigidBody* body = nullptr;
   btCollisionShape* shape = nullptr;
   btDefaultMotionState* motionState = nullptr;
@@ -38,16 +42,8 @@ struct HumanoidPhysicsPart {
   HumanoidPhysicsPart(Vector3 partSize, Vector3 offset, short group)
       : baseOffset(offset), size(partSize), collisionGroup(group) {}
 
-  ~HumanoidPhysicsPart() { cleanup(); }
-
-  void cleanup() {
-    delete body;
-    delete shape;
-    delete motionState;
-    body = nullptr;
-    shape = nullptr;
-    motionState = nullptr;
-  }
+  ~HumanoidPhysicsPart();
+  void cleanup();
 };
 
 // Facial feature for eyes and expressions
@@ -64,21 +60,13 @@ struct FacialFeature {
 
 class HumanoidCharacter : public GameObject {
  public:
-  static int totalCharactersCreated;
-  static int activeCharacters;
-  static constexpr float DEFAULT_MOVEMENT_SPEED = 5.0f;
-  static constexpr float DEFAULT_JUMP_FORCE = 15.0f;
-
-  static float calculateDistance(const HumanoidCharacter& char1,
-                                 const HumanoidCharacter& char2);
-  static Vector3 getCharacterSpacing(int characterCount);
-  static bool areCharactersOverlapping(const HumanoidCharacter& char1,
-                                       const HumanoidCharacter& char2);
-  static int getTotalCharactersCreated() { return totalCharactersCreated; }
-  static int getActiveCharacterCount() { return activeCharacters; }
-
   HumanoidCharacter(Vector3 position, GameWorld* gameWorld = nullptr);
   ~HumanoidCharacter();
+
+  HumanoidCharacter(const HumanoidCharacter&) = delete;
+  HumanoidCharacter& operator=(const HumanoidCharacter&) = delete;
+  HumanoidCharacter(HumanoidCharacter&&) = delete;
+  HumanoidCharacter& operator=(HumanoidCharacter&&) = delete;
 
   void setupPhysics(btDiscreteDynamicsWorld* bulletWorld);
   void removeFromPhysics(btDiscreteDynamicsWorld* bulletWorld);
@@ -185,5 +173,4 @@ class HumanoidCharacter : public GameObject {
   void updateVisualPositions();
   void animateCharacter(float deltaTime);
   void updateCharacterState();
-  void constrainBodyPartsToCharacter();
 };

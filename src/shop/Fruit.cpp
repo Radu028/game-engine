@@ -76,6 +76,11 @@ Fruit::Fruit(Vector3 position, FruitType fruitType)
       isPicked(false),
       name(getFruitName(fruitType)) {}
 
+void Fruit::draw() const {
+  if (isPicked) return;
+  Sphere::draw();
+}
+
 // Fruit interaction methods
 void Fruit::pickFruit() { isPicked = true; }
 

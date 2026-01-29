@@ -19,11 +19,7 @@ NPCManager::NPCManager()
       gen(rd()) {}
 
 NPCManager::~NPCManager() {
-  // Clean up any remaining NPCs
-  for (auto& npc : activeNPCs) {
-    npc->removeObserver(this);
-  }
-  activeNPCs.clear();
+  cleanupNPCs();
 }
 
 NPCManager* NPCManager::getInstance() {
@@ -46,6 +42,7 @@ void NPCManager::update(float deltaTime) {
   updateSpawnTimer(deltaTime);
 
   for (auto& npc : activeNPCs) {
+    if (!npc) continue;
     npc->update(deltaTime);
   }
 
@@ -87,6 +84,7 @@ void NPCManager::removeInactiveNPCs() {
   auto it =
       std::remove_if(activeNPCs.begin(), activeNPCs.end(),
                      [this](const std::shared_ptr<NPC>& npc) {
+                       if (!npc) return true;
                        if (!npc->getIsActive()) {
                          npc->removeObserver(this);
 
@@ -116,11 +114,8 @@ std::shared_ptr<NPC> NPCManager::createNPC() {
 }
 
 void NPCManager::onNPCFruitPicked(NPC* npc, std::shared_ptr<Fruit> fruit) {
-  totalFruitsPicked++;
-
-  if (fruit) {
-    totalFruitsPicked++;
-  }
+  (void)npc;
+  if (fruit) totalFruitsPicked++;
 }
 
 void NPCManager::onNPCExited(NPC* npc) { totalNPCsExited++; }

@@ -16,18 +16,20 @@ CubeObject::CubeObject(Vector3 position, Vector3 size, Color color,
       color(color),
       hasTexture(false),
       textureLoaded(false),
+      texturePath_(texturePath),
       model(LoadModelFromMesh(GenMeshCube(size.x, size.y, size.z))) {
   ShaderSystem* shaderSystem = ShaderSystem::getInstance();
   model.materials[0].shader = shaderSystem->getShader();
 
-  if (!texturePath.empty()) {
-    texture = LoadTexture(texturePath.c_str());
+  if (!texturePath_.empty()) {
+    texture = LoadTexture(texturePath_.c_str());
     if (texture.id > 0) {
       textureLoaded = true;
       hasTexture = true;
       model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
     } else {
-      TraceLog(LOG_WARNING, "Failed to load texture: %s", texturePath.c_str());
+      TraceLog(LOG_WARNING, "Failed to load texture: %s",
+               texturePath_.c_str());
     }
   }
 }
@@ -37,22 +39,32 @@ CubeObject::CubeObject(const CubeObject& other)
                  other.isStatic),
       size(other.size),
       color(other.color),
-      hasTexture(other.hasTexture),
-      textureLoaded(other.textureLoaded),
+      hasTexture(false),
+      textureLoaded(false),
+      texturePath_(other.texturePath_),
       model(LoadModelFromMesh(GenMeshCube(size.x, size.y, size.z))) {
   ShaderSystem* shaderSystem = ShaderSystem::getInstance();
   model.materials[0].shader = shaderSystem->getShader();
 
-  if (hasTexture) {
-    texture = other.texture;
-    model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
+  // Deep-copy texture by reloading it (raylib textures are GPU resources and
+  // cannot be safely copied by value).
+  if (!texturePath_.empty()) {
+    texture = LoadTexture(texturePath_.c_str());
+    if (texture.id > 0) {
+      textureLoaded = true;
+      hasTexture = true;
+      model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
+    } else {
+      TraceLog(LOG_WARNING, "Failed to load texture (copy): %s",
+               texturePath_.c_str());
+    }
   }
 }
 
 CubeObject::~CubeObject() {
   UnloadModel(model);
 
-  if (hasTexture) {
+  if (textureLoaded) {
     UnloadTexture(texture);
   }
 }

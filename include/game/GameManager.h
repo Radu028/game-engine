@@ -9,31 +9,24 @@
 #include "raylib.h"
 #include "shop/Shop.h"
 
-// Enum for different game states
 // Game management class using Singleton pattern
 class GameManager {
  private:
   static GameManager* instance;
 
-  Camera3D camera;
   std::shared_ptr<Shop> shop;
   NPCManager* npcManager;
   std::unique_ptr<NPCChatSystem> chatSystem;
 
   // Game parameters
-  int initialStockPerFruit;
-  int totalFruitsInStock;
   float gameTimer;
 
   // Statistics
   int fruitsPickedByNPCs;
   int npcsSoFar;
 
+  // Cached textures for NPC status billboards
   std::unordered_map<std::string, Texture2D> npcStatusTextures;
-  float npcStatusBillboardWidth;
-  float npcStatusVerticalOffset;
-  float npcStatusFontSize;
-  int npcStatusPadding;
 
   GameManager();
 
@@ -60,10 +53,6 @@ class GameManager {
   int getFruitsPickedByNPCs() const { return fruitsPickedByNPCs; }
   int getNPCCount() const;
   float getGameTime() const { return gameTimer; }
-
-  // Game events
-  void onFruitPicked();
-  void onNPCSpawned();
 
   // Chat system access
   NPCChatSystem* getChatSystem() const { return chatSystem.get(); }

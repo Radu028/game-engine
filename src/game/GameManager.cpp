@@ -10,8 +10,6 @@ GameManager* GameManager::instance = nullptr;
 GameManager::GameManager()
     : npcManager(nullptr),
       chatSystem(std::make_unique<NPCChatSystem>()),
-      initialStockPerFruit(10),
-      totalFruitsInStock(0),
       gameTimer(0.0f),
       fruitsPickedByNPCs(0),
       npcsSoFar(0) {
@@ -31,7 +29,23 @@ GameManager::GameManager()
   }
 }
 
-GameManager::~GameManager() {}
+GameManager::~GameManager() {
+  // Shut down NPC manager before the world is destroyed (ensures NPC bodies are
+  // removed from the world deterministically).
+  if (npcManager) {
+    NPCManager::destroyInstance();
+    npcManager = nullptr;
+  }
+
+  // Release cached billboard textures.
+  for (auto& entry : npcStatusTextures) {
+    auto& texture = entry.second;
+    if (texture.id > 0) {
+      UnloadTexture(texture);
+    }
+  }
+  npcStatusTextures.clear();
+}
 
 GameManager* GameManager::getInstance() {
   if (instance == nullptr) {
@@ -162,10 +176,6 @@ int GameManager::getNPCCount() const {
   return npcManager->getActiveNPCCount();
 }
 
-void GameManager::onFruitPicked() { fruitsPickedByNPCs++; }
-
-void GameManager::onNPCSpawned() { npcsSoFar++; }
-
 void GameManager::setShop(std::shared_ptr<Shop> newShop) {
   shop = newShop;
 
@@ -188,7 +198,4 @@ void GameManager::initializeShop() {
   // Create shop at the center of the world
   Vector3 shopPosition = {0.0f, 2.0f, -10.0f};
   shop = std::make_shared<Shop>(shopPosition);
-
-  // Count initial fruits
-  totalFruitsInStock = shop->getTotalFruitCount();
 }

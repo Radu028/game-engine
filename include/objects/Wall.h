@@ -12,6 +12,12 @@ class Wall : public StaticWorldObject {
  public:
   Wall(Vector3 position, Vector3 dimensions, Color color,
        bool hasCollisions = true);
+  ~Wall() override;
+
+  Wall(const Wall&) = delete;
+  Wall& operator=(const Wall&) = delete;
+  Wall(Wall&&) = delete;
+  Wall& operator=(Wall&&) = delete;
 
   void draw() const override;
   BoundingBox getBoundingBox() const override;

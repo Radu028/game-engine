@@ -26,31 +26,11 @@ constexpr float kMinVerticalAngle = -89.0f;
 constexpr float kScrollScale = 2.0f;
 }  // namespace
 
-Application::Application()
-    : camera{},
-      cameraDistance(25.0f),
-      cameraAngleX(0.0f),
-      cameraAngleY(0.0f),
-      shaderSystem(nullptr),
-      world(nullptr),
-      gameManager(nullptr) {}
-
-Application::~Application() {
-  GameManager::destroyInstance();
-  GameWorld::destroyInstance();
-}
-
-int Application::run() {
+namespace {
+template <typename Fn>
+int runGuarded(Fn&& fn) {
   try {
-    initialize();
-
-    while (!renderer.shouldClose()) {
-      const float deltaTime = renderer.frameTime();
-      processInput(deltaTime);
-      update(deltaTime);
-      render();
-    }
-
+    fn();
     return 0;
   } catch (const GameInitException& e) {
     TraceLog(LOG_ERROR, "Game Initialization Error: %s", e.what());
@@ -75,6 +55,35 @@ int Application::run() {
     return -7;
   }
 }
+}  // namespace
+
+Application::Application()
+    : camera{},
+      cameraDistance(25.0f),
+      cameraAngleX(0.0f),
+      cameraAngleY(0.0f),
+      shaderSystem(nullptr),
+      world(nullptr),
+      gameManager(nullptr) {}
+
+Application::~Application() {
+  GameManager::destroyInstance();
+  GameWorld::destroyInstance();
+  ShaderSystem::destroyInstance();
+}
+
+int Application::run() {
+  return runGuarded([&] {
+    initialize();
+
+    while (!renderer.shouldClose()) {
+      const float deltaTime = renderer.frameTime();
+      processInput(deltaTime);
+      update(deltaTime);
+      render();
+    }
+  });
+}
 
 void Application::initialize() {
   renderer.initialize(kWindowWidth, kWindowHeight, kWindowTitle);
@@ -95,13 +104,9 @@ void Application::initialize() {
       std::make_shared<HumanoidCharacter>(Vector3{0.0f, 1.0f, 15.0f}, world);
   world->addObject(playerCharacter);
   playerController = std::make_unique<PlayerController>(playerCharacter);
-  if (!playerController) {
-    throw GameInitException("Failed to create player controller");
-  }
 
-  world->addObject(std::make_shared<Floor>(Vector3{0.0f, 0.0f, 0.0f},
-                                           Vector3{50.0f, 1.0f, 50.0f},
-                                           DARKGREEN, true));
+  world->addObject(std::make_shared<Floor>(
+      Vector3{0.0f, 0.0f, 0.0f}, Vector3{50.0f, 1.0f, 50.0f}, DARKGREEN, true));
 
   gameManager = GameManager::getInstance();
 }

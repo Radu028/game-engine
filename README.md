@@ -18,7 +18,6 @@ This project demonstrates a complete 3D interactive environment featuring:
 
 - **Inheritance and Polymorphism**: Robust class hierarchy with `GameObject` as abstract base class
 - **Memory Management**: Smart pointer architecture eliminating manual memory management
-- **Template-Based Programming**: Generic object management and type-safe operations
 - **Exception Safety**: Comprehensive exception hierarchy for robust error handling
 - **Design Patterns**: Implementation of Singleton, State, Observer patterns
 
@@ -42,7 +41,7 @@ This project demonstrates a complete 3D interactive environment featuring:
 
 ## System Requirements
 
-- C++17 compatible compiler (GCC 7+, Clang 5+, or MSVC 2017+)
+- C++23 compatible compiler
 - CMake 3.16+ build system
 - raylib graphics library
 - Bullet Physics simulation library

@@ -3,6 +3,7 @@
 #include <btBulletDynamicsCommon.h>
 
 #include <string>
+#include <utility>
 
 #include "physics/PhysicsTypes.h"
 #include "systems/ShaderSystem.h"
@@ -12,7 +13,9 @@ Floor::Floor(Vector3 position, Vector3 dimensions, Color color,
     : StaticWorldObject(position, hasCollision),
       dimensions(dimensions),
       color(color),
-      hasTexture(false) {
+      hasTexture(false),
+      textureLoaded(false),
+      texturePath_("") {
   model = LoadModelFromMesh(
       GenMeshCube(dimensions.x, dimensions.y, dimensions.z));
 
@@ -22,22 +25,37 @@ Floor::Floor(Vector3 position, Vector3 dimensions, Color color,
 
 Floor::Floor(Vector3 position, Vector3 dimensions, std::string texturePath,
              bool hasCollision)
-    : StaticWorldObject(position, true),
+    : StaticWorldObject(position, hasCollision),
       dimensions(dimensions),
       color(WHITE),
-      hasTexture(false) {
+      hasTexture(false),
+      textureLoaded(false),
+      texturePath_(std::move(texturePath)) {
   model =
       LoadModelFromMesh(GenMeshCube(dimensions.x, dimensions.y, dimensions.z));
 
   ShaderSystem* shaderSystem = ShaderSystem::getInstance();
   model.materials[0].shader = shaderSystem->getShader();
 
-  Texture2D texture = LoadTexture(texturePath.c_str());
-  if (texture.id > 0) {
-    hasTexture = true;
-    model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
+  if (!texturePath_.empty()) {
+    texture = LoadTexture(texturePath_.c_str());
+    if (texture.id > 0) {
+      textureLoaded = true;
+      hasTexture = true;
+      model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
+    } else {
+      TraceLog(LOG_WARNING, "Failed to load texture: %s",
+               texturePath_.c_str());
+    }
   } else {
-    TraceLog(LOG_WARNING, "Failed to load texture: %s", texturePath.c_str());
+    TraceLog(LOG_WARNING, "Floor texture path is empty");
+  }
+}
+
+Floor::~Floor() {
+  UnloadModel(model);
+  if (textureLoaded) {
+    UnloadTexture(texture);
   }
 }
 
@@ -58,7 +76,11 @@ BoundingBox Floor::getBoundingBox() const {
 }
 
 std::unique_ptr<GameObject> Floor::clone() const {
-  return std::make_unique<Floor>(*this);
+  if (hasTexture && !texturePath_.empty()) {
+    return std::make_unique<Floor>(position, dimensions, texturePath_,
+                                   hasCollision);
+  }
+  return std::make_unique<Floor>(position, dimensions, color, hasCollision);
 }
 
 PhysicsBodyConfig Floor::getPhysicsConfig() const {

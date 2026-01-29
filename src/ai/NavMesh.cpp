@@ -68,56 +68,6 @@ void NavMesh::generateNavMesh() {
   connectNodes();
 }
 
-// void NavMesh::connectNodes() {
-//   // Clear all existing connections first
-//   for (auto& node : nodes) {
-//     node.connections.clear();
-//   }
-
-//   // OPTIMIZED: O(n) grid-based connection instead of O(n²)
-//   // Calculate grid dimensions
-//   int gridWidth =
-//       static_cast<int>((maxBounds.x - minBounds.x) / nodeSpacing) + 1;
-//   int gridHeight =
-//       static_cast<int>((maxBounds.z - minBounds.z) / nodeSpacing) + 1;
-
-//   // Lambda to convert 2D grid coordinates to 1D node index
-//   auto getNodeIndex = [&](int x, int z) -> int {
-//     if (x < 0 || x >= gridWidth || z < 0 || z >= gridHeight) return -1;
-//     return z * gridWidth + x;
-//   };
-
-//   // Lambda to convert node index to grid coordinates
-//   auto getGridCoords = [&](int nodeIndex) -> std::pair<int, int> {
-//     int z = nodeIndex / gridWidth;
-//     int x = nodeIndex % gridWidth;
-//     return {x, z};
-//   };
-
-//   // Connect each node only to its immediate neighbors (8-connected)
-//   for (size_t i = 0; i < nodes.size(); ++i) {
-//     if (!nodes[i].walkable) continue;
-
-//     auto [gridX, gridZ] = getGridCoords(i);
-
-//     // Check 8 neighbors (4-directional + 4-diagonal)
-//     for (int dx = -1; dx <= 1; ++dx) {
-//       for (int dz = -1; dz <= 1; ++dz) {
-//         if (dx == 0 && dz == 0) continue;  // Skip self
-
-//         int neighborIndex = getNodeIndex(gridX + dx, gridZ + dz);
-//         if (neighborIndex == -1 ||
-//             neighborIndex >= static_cast<int>(nodes.size()))
-//           continue;
-//         if (!nodes[neighborIndex].walkable) continue;
-
-//         // Add bidirectional connection
-//         nodes[i].connections.push_back(neighborIndex);
-//       }
-//     }
-//   }
-// }
-
 void NavMesh::connectNodes() {
   for (auto& node : nodes) {
     node.connections.clear();
@@ -536,8 +486,8 @@ std::vector<Vector3> NavMesh::findAlternativePath(Vector3 start, Vector3 end,
     for (size_t i = 0; i < nodes.size(); ++i) {
       float distance = Vector3Distance(nodes[i].position, blockedArea);
       if (distance <= blockRadius && nodes[i].walkable) {
-        nodes[i].walkable = false;
-        temporarilyBlockedNodes.push_back(i);
+        setNodeWalkable(static_cast<int>(i), false);
+        temporarilyBlockedNodes.push_back(static_cast<int>(i));
       }
     }
 
@@ -546,9 +496,7 @@ std::vector<Vector3> NavMesh::findAlternativePath(Vector3 start, Vector3 end,
 
     // Restore the temporarily blocked nodes
     for (int nodeIndex : temporarilyBlockedNodes) {
-      if (nodeIndex >= 0 && nodeIndex < static_cast<int>(nodes.size())) {
-        nodes[nodeIndex].walkable = true;
-      }
+      setNodeWalkable(nodeIndex, true);
     }
 
     // If we found a valid path with this block radius, use it
@@ -586,7 +534,8 @@ void NavMesh::markNodesInArea(Vector3 center, Vector3 size, bool walkable,
   Vector3 expandedSize = {size.x + margin * 2.0f, size.y,
                           size.z + margin * 2.0f};
 
-  for (auto& node : nodes) {
+  for (int i = 0; i < static_cast<int>(nodes.size()); ++i) {
+    const auto& node = nodes[static_cast<size_t>(i)];
     Vector3 diff = Vector3Subtract(node.position, center);
 
     // Check if node is within the expanded obstacle area (X and Z only)
@@ -594,18 +543,10 @@ void NavMesh::markNodesInArea(Vector3 center, Vector3 size, bool walkable,
         std::abs(diff.z) <= expandedSize.z / 2.0f) {
       // Only affect ground-level nodes (nodes at NavMesh level)
       if (std::abs(node.position.y - (groundLevel + 0.5f)) < 0.2f) {
-        node.walkable = walkable;
+        setNodeWalkable(i, walkable);
       }
     }
   }
-}
-
-void NavMesh::addShelfObstacle(Vector3 shelfPos, Vector3 shelfSize) {
-  addObstacle(shelfPos, shelfSize, "shelf");
-}
-
-void NavMesh::addWallObstacle(Vector3 wallPos, Vector3 wallSize) {
-  addObstacle(wallPos, wallSize, "wall");
 }
 
 void NavMesh::removeObstacle(Vector3 position, Vector3 size) {
@@ -711,26 +652,6 @@ void NavMesh::unregisterObject(GameObject* object) {
   }
 }
 
-void NavMesh::updateAllRegisteredObjects() {
-  // For performance: static objects are NEVER updated after initial setup
-  // NPCs don't need pathfinding updates - they are too small to block
-  // significantly
-
-  // Only clean up invalid objects
-  auto it = registeredObjects.begin();
-  while (it != registeredObjects.end()) {
-    try {
-      // Just verify object is still valid, don't update positions
-      it->object->getPosition();  // This will throw if invalid
-      ++it;
-    } catch (...) {
-      // Object is invalid, remove it
-      objectSet.erase(it->object);
-      it = registeredObjects.erase(it);
-    }
-  }
-}
-
 void NavMesh::updateObjectBlocking(GameObject* object) {
   if (!object) return;
 
@@ -787,6 +708,11 @@ bool NavMesh::shouldObjectBlockPath(GameObject* object) const {
 
   // Floor objects should never block pathfinding - they are the walking surface
   if (objectType == "floor") {
+    return false;
+  }
+
+  // Pickups/items should not be treated as obstacles.
+  if (objectType == "pickup" || objectType == "item") {
     return false;
   }
 

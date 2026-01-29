@@ -37,6 +37,7 @@ NPC::NPC(Vector3 position, std::shared_ptr<Shop> shop, GameWorld* world)
       detectionRadius(5.0f),
       interactionRadius(1.0f),
       isActive(true),
+      exitNotified(false),
       lifetimeTimer(0.0f),
       maxLifetime(60.0f),
       hasDestination(false),
@@ -109,6 +110,11 @@ void NPC::update(float deltaTime) {
 
   if (currentState) {
     currentState->update(this, deltaTime);
+  }
+
+  // States are allowed to deactivate the NPC (e.g., leaving the scene).
+  if (!isActive) {
+    return;
   }
 
   if (hasDestination) {
@@ -369,6 +375,8 @@ void NPC::notifyFruitPicked(std::shared_ptr<Fruit> fruit) {
 }
 
 void NPC::notifyExited() {
+  if (exitNotified) return;
+  exitNotified = true;
   for (auto* observer : observers) {
     observer->onNPCExited(this);
   }
@@ -408,7 +416,7 @@ void NPC::sayMessage(const std::string& context) const {
   }
 
   if (!message.empty()) {
-    // chatSystem->addMessage(message, getPosition());
+    chatSystem->addMessage(message, getTorsoPosition());
   }
 }
 

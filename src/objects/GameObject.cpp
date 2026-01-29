@@ -1,11 +1,15 @@
 #include "objects/GameObject.h"
 
+#include <cfloat>
 #include <cmath>
 
 #include "GameWorld.h"
 #include "physics/PhysicsTypes.h"
-#include "btBulletDynamicsCommon.h"
 #include "raymath.h"
+
+namespace {
+constexpr float kEpsilon = 1e-6f;
+}  // namespace
 
 GameObject::GameObject(Vector3 position, bool hasCollision,
                        bool affectedByGravity, bool isStatic)
@@ -94,7 +98,7 @@ float GameObject::getVerticalCollisionContactTime(
   }
 
   for (int i = 0; i < maxIterations; i++) {
-    if ((t1 - t0) < EPSILON) break;
+    if ((t1 - t0) < kEpsilon) break;
     tMid = (t0 + t1) / 2.0f;
     Vector3 testDisplacementAtMid = Vector3Scale(verticalMovementVector, tMid);
 

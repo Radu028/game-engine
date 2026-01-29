@@ -79,9 +79,11 @@ void BulletPhysicsEngine::removeObject(GameObject& object) {
 }
 
 void BulletPhysicsEngine::update(float deltaTime) {
-  const float fixedTimeStep = 1.0f / 60.0f;
-  const int maxSubSteps = 10;
-  dynamicsWorld->stepSimulation(deltaTime, maxSubSteps, fixedTimeStep);
+  // Validate deltaTime to prevent physics instability
+  if (deltaTime <= 0.0f || deltaTime > 1.0f) return;
+
+  dynamicsWorld->stepSimulation(deltaTime, GameSettings::Physics::MAX_SUBSTEPS,
+                                GameSettings::Physics::FIXED_TIMESTEP);
 
   for (auto& entry : bodies) {
     if (!entry.object || !entry.body) continue;
@@ -95,8 +97,11 @@ btDiscreteDynamicsWorld* BulletPhysicsEngine::getNativeWorld() {
 
 void BulletPhysicsEngine::syncFromBullet(GameObject& object,
                                          btRigidBody& body) const {
+  btMotionState* motionState = body.getMotionState();
+  if (!motionState) return;
+
   btTransform transform;
-  body.getMotionState()->getWorldTransform(transform);
+  motionState->getWorldTransform(transform);
   const btVector3& origin = transform.getOrigin();
   object.setPosition({origin.x(), origin.y(), origin.z()});
 }
@@ -141,5 +146,3 @@ btCollisionShape* BulletPhysicsEngine::createShape(
       return nullptr;
   }
 }
-
-

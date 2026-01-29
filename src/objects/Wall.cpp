@@ -15,6 +15,8 @@ Wall::Wall(Vector3 position, Vector3 dimensions, Color color, bool hasCollision)
   model.materials[0].shader = shaderSystem->getShader();
 }
 
+Wall::~Wall() { UnloadModel(model); }
+
 void Wall::draw() const {
   DrawModel(model, position, 1.0f, color);
 }
@@ -31,7 +33,7 @@ BoundingBox Wall::getBoundingBox() const {
 }
 
 std::unique_ptr<GameObject> Wall::clone() const {
-  return std::make_unique<Wall>(*this);
+  return std::make_unique<Wall>(position, dimensions, color, hasCollision);
 }
 
 PhysicsBodyConfig Wall::getPhysicsConfig() const {
