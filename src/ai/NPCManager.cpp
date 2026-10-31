@@ -1,26 +1,25 @@
 #include "ai/NPCManager.h"
 
 #include <algorithm>
+#include <utility>
 
 #include "GameWorld.h"
 
 NPCManager* NPCManager::instance = nullptr;
 
 NPCManager::NPCManager()
-    : spawnTimer(0.0f),
+    : chatSystem(nullptr),
+      spawnTimer(0.0f),
       spawnInterval(0.5f),
       minSpawnInterval(3.0f),
       maxSpawnInterval(8.0f),
       maxActiveNPCs(5),
-      chatSystem(nullptr),
       totalNPCsSpawned(0),
       totalFruitsPicked(0),
       totalNPCsExited(0),
       gen(rd()) {}
 
-NPCManager::~NPCManager() {
-  cleanupNPCs();
-}
+NPCManager::~NPCManager() { cleanupNPCs(); }
 
 NPCManager* NPCManager::getInstance() {
   if (instance == nullptr) {
@@ -118,13 +117,23 @@ void NPCManager::onNPCFruitPicked(NPC* npc, std::shared_ptr<Fruit> fruit) {
   if (fruit) totalFruitsPicked++;
 }
 
-void NPCManager::onNPCExited(NPC* npc) { totalNPCsExited++; }
+void NPCManager::onNPCExited(NPC* npc) {
+  (void)npc;
+  totalNPCsExited++;
+}
 
 void NPCManager::onNPCEnteredShop(NPC* npc) {
+  (void)npc;
   // Track NPC shop entry
 }
 
 void NPCManager::setSpawnInterval(float min, float max) {
+  if (min > max) {
+    std::swap(min, max);
+  }
+  min = std::max(0.5f, min);
+  max = std::max(min, max);
+
   minSpawnInterval = min;
   maxSpawnInterval = max;
 
@@ -135,10 +144,18 @@ void NPCManager::setSpawnInterval(float min, float max) {
 }
 
 Vector3 NPCManager::getRandomSpawnPosition() const {
-  std::uniform_real_distribution<float> xOffset(-3.0f, 8.0f);
-  std::uniform_real_distribution<float> zOffset(6.0f, 12.0f);
+  if (!shop) {
+    return {0.0f, 0.5f, 5.0f};
+  }
 
-  Vector3 spawnPos = {xOffset(gen), 0.5f, zOffset(gen)};
+  // Spawn NPCs near the shop entrance
+  Vector3 exitPos = shop->getExitPosition();
+
+  // Random offset around the exit position
+  std::uniform_real_distribution<float> xOffset(-3.0f, 3.0f);
+  std::uniform_real_distribution<float> zOffset(2.0f, 6.0f);
+
+  Vector3 spawnPos = {exitPos.x + xOffset(gen), 0.5f, exitPos.z + zOffset(gen)};
 
   return spawnPos;
 }

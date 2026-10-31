@@ -30,30 +30,7 @@ void HumanoidPhysicsPart::cleanup() {
 
 HumanoidCharacter::HumanoidCharacter(Vector3 position, GameWorld* gameWorld)
     : GameObject(position, true, true, false),
-      // Initialize body parts with calculated offsets
-      head(GameSettings::BodyParts::HEAD_SIZE,
-           GameSettings::BodyParts::HEAD_COLOR,
-           {0, GameSettings::CharacterCalculations::getHeadBaseYOffset(), 0}),
-      torso(GameSettings::BodyParts::TORSO_SIZE,
-            GameSettings::BodyParts::TORSO_COLOR,
-            {0, GameSettings::CharacterCalculations::getTorsoBaseYOffset(), 0}),
-      leftArm(GameSettings::BodyParts::ARM_SIZE,
-              GameSettings::BodyParts::ARM_COLOR,
-              {-GameSettings::BodyParts::ARM_OFFSET_X,
-               GameSettings::CharacterCalculations::getArmBaseYOffset(), 0}),
-      rightArm(GameSettings::BodyParts::ARM_SIZE,
-               GameSettings::BodyParts::ARM_COLOR,
-               {GameSettings::BodyParts::ARM_OFFSET_X,
-                GameSettings::CharacterCalculations::getArmBaseYOffset(), 0}),
-      leftLeg(GameSettings::BodyParts::LEG_SIZE,
-              GameSettings::BodyParts::LEG_COLOR,
-              {-GameSettings::BodyParts::LEG_OFFSET_X,
-               GameSettings::CharacterCalculations::getLegBaseYOffset(), 0}),
-      rightLeg(GameSettings::BodyParts::LEG_SIZE,
-               GameSettings::BodyParts::LEG_COLOR,
-               {GameSettings::BodyParts::LEG_OFFSET_X,
-                GameSettings::CharacterCalculations::getLegBaseYOffset(), 0}),
-      // Initialize physics components for body parts
+      // Initialize physics components for body parts.
       headPhysics(
           GameSettings::BodyParts::HEAD_SIZE,
           {0, GameSettings::CharacterCalculations::getHeadBaseYOffset(), 0},
@@ -82,6 +59,29 @@ HumanoidCharacter::HumanoidCharacter(Vector3 position, GameWorld* gameWorld)
           {GameSettings::BodyParts::LEG_OFFSET_X,
            GameSettings::CharacterCalculations::getLegBaseYOffset(), 0},
           GameSettings::Collision::Groups::CHARACTER_LEGS),
+      // Initialize body parts with calculated offsets.
+      head(GameSettings::BodyParts::HEAD_SIZE,
+           GameSettings::BodyParts::HEAD_COLOR,
+           {0, GameSettings::CharacterCalculations::getHeadBaseYOffset(), 0}),
+      torso(GameSettings::BodyParts::TORSO_SIZE,
+            GameSettings::BodyParts::TORSO_COLOR,
+            {0, GameSettings::CharacterCalculations::getTorsoBaseYOffset(), 0}),
+      leftArm(GameSettings::BodyParts::ARM_SIZE,
+              GameSettings::BodyParts::ARM_COLOR,
+              {-GameSettings::BodyParts::ARM_OFFSET_X,
+               GameSettings::CharacterCalculations::getArmBaseYOffset(), 0}),
+      rightArm(GameSettings::BodyParts::ARM_SIZE,
+               GameSettings::BodyParts::ARM_COLOR,
+               {GameSettings::BodyParts::ARM_OFFSET_X,
+                GameSettings::CharacterCalculations::getArmBaseYOffset(), 0}),
+      leftLeg(GameSettings::BodyParts::LEG_SIZE,
+              GameSettings::BodyParts::LEG_COLOR,
+              {-GameSettings::BodyParts::LEG_OFFSET_X,
+               GameSettings::CharacterCalculations::getLegBaseYOffset(), 0}),
+      rightLeg(GameSettings::BodyParts::LEG_SIZE,
+               GameSettings::BodyParts::LEG_COLOR,
+               {GameSettings::BodyParts::LEG_OFFSET_X,
+                GameSettings::CharacterCalculations::getLegBaseYOffset(), 0}),
       // Eye features positioned on front of head
       leftEye(
           {0.08f, 0.08f, 0.12f}, BLACK,
@@ -446,7 +446,7 @@ void HumanoidCharacter::onRemovedFromWorld(GameWorld& world) {
   removeFromPhysics(world.getDynamicsWorld());
 }
 
-void HumanoidCharacter::moveTowards(Vector3 target, float deltaTime) {
+void HumanoidCharacter::moveTowards(Vector3 target, float /*deltaTime*/) {
   // Calculate direction to target
   Vector3 direction = Vector3Subtract(target, position);
   direction.y = 0;  // Only move on horizontal plane
@@ -658,15 +658,12 @@ bool HumanoidCharacter::wouldCollideAfterMovement(Vector3 movement,
                                0,  // Don't predict Y movement for simplicity
                                movement.z * deltaTime};
 
-  // Temporarily store current character position
-  Vector3 originalPos = getPosition();
-
-  // Check predicted positions against world obstacles
-  Vector3 predictedPosition = Vector3Add(originalPos, predictedMovement);
+  // Use the physics body center as reference for body-part offsets.
+  Vector3 originalCenterPos = getTorsoPosition();
 
   auto computePredictedBox = [&](const HumanoidVisualPart& part) {
-    Vector3 offset = Vector3Add(part.currentOffset, predictedMovement);
-    Vector3 center = Vector3Add(predictedPosition, offset);
+    Vector3 center = Vector3Add(originalCenterPos, part.currentOffset);
+    center = Vector3Add(center, predictedMovement);
     Vector3 halfSize = Vector3Scale(part.visual.getSize(), 0.5f);
     return BoundingBox{Vector3Subtract(center, halfSize),
                        Vector3Add(center, halfSize)};
@@ -685,6 +682,15 @@ bool HumanoidCharacter::wouldCollideAfterMovement(Vector3 movement,
   const auto& objects = world->getObjects();
   for (const auto& obj : objects) {
     if (obj.get() == this) continue;  // Skip self
+    if (!obj || !obj->getHasCollision()) continue;
+
+    // Ignore non-blocking objects for movement prediction.
+    const std::string obstacleType = obj->getObstacleType();
+    if (obstacleType == "floor" || obstacleType == "pickup" ||
+        obstacleType == "item" || obstacleType == "npc" ||
+        obstacleType == "character" || obstacleType == "player") {
+      continue;
+    }
 
     BoundingBox objBox = obj->getBoundingBox();
 

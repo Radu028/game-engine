@@ -1,12 +1,15 @@
 #include "ai/NPCStates.h"
 
+#include <algorithm>
 #include <cmath>
 #include <random>
 
+#include "GameWorld.h"
 #include "ai/NPC.h"
 #include "raymath.h"
 #include "settings/Physics.h"
 #include "shop/Shelf.h"
+#include "shop/Shop.h"
 
 namespace {
 std::mt19937& rng() {
@@ -22,6 +25,20 @@ float rand01() {
 float randRange(float min, float max) {
   std::uniform_real_distribution<float> dist(min, max);
   return dist(rng());
+}
+
+Vector3 normalizeOrFallback(Vector3 value, Vector3 fallback = {0.0f, 0.0f, 1.0f}) {
+  float len = Vector3Length(value);
+  if (len > 0.0001f) {
+    return Vector3Scale(value, 1.0f / len);
+  }
+
+  float fallbackLen = Vector3Length(fallback);
+  if (fallbackLen > 0.0001f) {
+    return Vector3Scale(fallback, 1.0f / fallbackLen);
+  }
+
+  return {0.0f, 0.0f, 1.0f};
 }
 
 size_t randIndex(size_t n) {
@@ -40,20 +57,23 @@ void IdleState::update(NPC* npc, float deltaTime) {
   idleTime += deltaTime;
 
   if (idleTime >= maxIdleTime) {
-    npc->changeState(std::make_unique<ShoppingState>());
+    // Go to entrance first, then start shopping
+    npc->changeState(std::make_unique<EnteringState>());
   }
 }
 
-void IdleState::exit(NPC* npc) {}
+void IdleState::exit(NPC* /*npc*/) {}
 
-void ShoppingState::enter(NPC* npc) {
+void ShoppingState::enter(NPC* /*npc*/) {
   shoppingTime = 0.0f;
+  maxShoppingTime = GameSettings::NPC::MAX_SHOPPING_TIME;
   fruitSearchTimer = 0.0f;
   shelfLookingTimer = 0.0f;
   chatTimer = 0.0f;
   isLookingAtShelf = false;
   hasPurchasedSomething = false;
   shelvesVisited = 0;
+  minShelvesToVisit = GameSettings::NPC::MIN_SHELVES_TO_VISIT;
   currentShelf = nullptr;
 }
 
@@ -62,7 +82,13 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
   fruitSearchTimer += deltaTime;
   chatTimer += deltaTime;
 
-  auto shelves = npc->getTargetShop()->getShelves();
+  auto shop = npc->getTargetShop();
+  if (!shop) {
+    npc->setActive(false);
+    return;
+  }
+
+  const auto& shelves = shop->getShelves();
   if (shelves.empty()) {
     npc->changeState(std::make_unique<WanderingState>());
     return;
@@ -89,7 +115,7 @@ void ShoppingState::update(NPC* npc, float deltaTime) {
   }
 }
 
-void ShoppingState::exit(NPC* npc) { currentShelf = nullptr; }
+void ShoppingState::exit(NPC* /*npc*/) { currentShelf = nullptr; }
 
 void ShoppingState::handleChatting(NPC* npc) {
   if (chatTimer < GameSettings::NPC::CHAT_INTERVAL) return;
@@ -124,24 +150,27 @@ void ShoppingState::handleShelfLooking(NPC* npc, float deltaTime,
 }
 
 bool ShoppingState::shouldPurchaseFruit() const {
-  if (!hasPurchasedSomething && shelvesVisited >= minShelvesToVisit) {
-    return rand01() < 0.8f;
+  // More likely to purchase - simulates real shopping behavior
+  if (!hasPurchasedSomething) {
+    return rand01() < 0.9f;  // 90% chance to buy first item
   }
-  if (hasPurchasedSomething) {
-    return rand01() < 0.3f;
-  }
-  return rand01() < 0.2f;
+  // After first purchase, 50% chance to buy more
+  return rand01() < 0.5f;
 }
 
 void ShoppingState::attemptFruitPurchase(NPC* npc) {
   if (!currentShelf) return;
 
-  auto availableFruits = currentShelf->getFruits();
+  const auto& availableFruits = currentShelf->getFruits();
   if (availableFruits.empty()) return;
 
   for (auto fruit : availableFruits) {
     if (fruit && !fruit->getIsPicked()) {
       fruit->pickFruit();
+      currentShelf->removeFruit(fruit);
+      if (GameWorld* world = GameWorld::getInstance()) {
+        world->removeObject(fruit);
+      }
       npc->notifyFruitPicked(fruit);
       hasPurchasedSomething = true;
       npc->sayMessage("fruit");
@@ -150,8 +179,15 @@ void ShoppingState::attemptFruitPurchase(NPC* npc) {
   }
 }
 
-void ShoppingState::handleMovement(NPC* npc, float deltaTime) {
+void ShoppingState::handleMovement(NPC* npc, float /*deltaTime*/) {
   if (!currentShelf) return;
+
+  if (!npc->hasValidDestination()) {
+    if (!npc->setDestination(currentTarget)) {
+      currentShelf = nullptr;
+    }
+    return;
+  }
 
   // If the shelf became empty (someone else bought everything), pick another.
   if (currentShelf->isEmpty()) {
@@ -172,13 +208,19 @@ void ShoppingState::handleMovement(NPC* npc, float deltaTime) {
 void ShoppingState::handleShelfSearch(NPC* npc) {
   if (isLookingAtShelf) return;
 
-  auto shelves = npc->getTargetShop()->getShelves();
+  auto shop = npc->getTargetShop();
+  if (!shop) {
+    npc->setActive(false);
+    return;
+  }
+
+  const auto& shelves = shop->getShelves();
   auto targetShelf = findTargetShelf(npc, shelves);
 
   if (targetShelf) {
     moveToShelf(npc, targetShelf);
   } else {
-    npc->changeState(std::make_unique<IdleState>());
+    npc->changeState(std::make_unique<LeavingState>());
   }
 
   fruitSearchTimer = 0.0f;
@@ -198,14 +240,20 @@ std::shared_ptr<Shelf> ShoppingState::findTargetShelf(
     candidates.push_back(shelf);
   }
 
-  const auto& pool = !candidates.empty() ? candidates : shelves;
-  // If we fell back to `shelves`, make sure we pick a non-null shelf.
-  for (int tries = 0; tries < 8; ++tries) {
-    auto picked = pool[randIndex(pool.size())];
-    if (picked) return picked;
+  if (candidates.empty()) {
+    return nullptr;
   }
-  for (const auto& shelf : shelves) {
-    if (shelf) return shelf;
+
+  for (int tries = 0; tries < 8; ++tries) {
+    auto picked = candidates[randIndex(candidates.size())];
+    if (picked) {
+      return picked;
+    }
+  }
+  for (const auto& shelf : candidates) {
+    if (shelf) {
+      return shelf;
+    }
   }
   return nullptr;
 }
@@ -216,7 +264,10 @@ void ShoppingState::moveToShelf(NPC* npc, std::shared_ptr<Shelf> shelf) {
 
   currentTarget = shelfPos;
   currentShelf = shelf;
-  npc->setDestination(currentTarget);
+  if (!npc->setDestination(currentTarget)) {
+    currentShelf = nullptr;
+    return;
+  }
 
   // If very close to shelf, start looking
   if (Vector3Distance(npcPos, shelfPos) <
@@ -226,7 +277,7 @@ void ShoppingState::moveToShelf(NPC* npc, std::shared_ptr<Shelf> shelf) {
   }
 }
 
-bool ShoppingState::shouldLeaveShop(NPC* npc) const {
+bool ShoppingState::shouldLeaveShop(NPC* /*npc*/) const {
   if (shoppingTime >= maxShoppingTime) return true;
 
   if (!hasPurchasedSomething || shelvesVisited < minShelvesToVisit) {
@@ -237,8 +288,9 @@ bool ShoppingState::shouldLeaveShop(NPC* npc) const {
 }
 
 // WanderingState implementation
-void WanderingState::enter(NPC* npc) {
+void WanderingState::enter(NPC* /*npc*/) {
   wanderTime = 0.0f;
+  maxWanderTime = GameSettings::NPC::MAX_WANDER_TIME;
   hasWanderTarget = false;
 }
 
@@ -251,25 +303,23 @@ void WanderingState::update(NPC* npc, float deltaTime) {
     return;
   }
 
-  Vector3 currentPos = npc->getPosition();
-  Vector3 targetPos = shop->getRandomInteriorPosition();
-
-  float distanceToTarget = Vector3Distance(currentPos, targetPos);
-  if (distanceToTarget < 8.0f) {
+  if (wanderTime >= maxWanderTime) {
     npc->changeState(std::make_unique<ShoppingState>());
     return;
   }
 
-  if (!hasWanderTarget || wanderTime >= maxWanderTime) {
+  if (!hasWanderTarget) {
+    Vector3 currentPos = npc->getPosition();
+    Vector3 targetPos = shop->getRandomInteriorPosition();
     Vector3 toTarget = Vector3Subtract(targetPos, currentPos);
-    toTarget = Vector3Normalize(toTarget);
+    toTarget = normalizeOrFallback(toTarget);
 
     float angle = randRange(-PI / 3, PI / 3);
 
     Vector3 wanderDirection = {
-        toTarget.x * cos(angle) - toTarget.z * sin(angle), 0,
-        toTarget.x * sin(angle) + toTarget.z * cos(angle)};
-    wanderDirection = Vector3Normalize(wanderDirection);
+        toTarget.x * cosf(angle) - toTarget.z * sinf(angle), 0.0f,
+        toTarget.x * sinf(angle) + toTarget.z * cosf(angle)};
+    wanderDirection = normalizeOrFallback(wanderDirection);
 
     float wanderDistance = randRange(5.0f, 12.0f);
 
@@ -278,16 +328,132 @@ void WanderingState::update(NPC* npc, float deltaTime) {
     wanderTarget.y = currentPos.y;
 
     hasWanderTarget = true;
-    wanderTime = 0.0f;
-    npc->setDestination(wanderTarget);
+    if (!npc->setDestination(wanderTarget)) {
+      hasWanderTarget = false;
+    }
+  } else if (!npc->hasValidDestination()) {
+    if (!npc->setDestination(wanderTarget)) {
+      hasWanderTarget = false;
+    }
   }
 
-  if (wanderTime > GameSettings::NPC::MAX_WANDER_TIME + 3.0f) {
+  if (npc->isNearTarget(wanderTarget, GameSettings::NPC::ARRIVAL_THRESHOLD)) {
     npc->changeState(std::make_unique<ShoppingState>());
   }
 }
 
-void WanderingState::exit(NPC* npc) { hasWanderTarget = false; }
+void WanderingState::exit(NPC* /*npc*/) { hasWanderTarget = false; }
+
+// EnteringState implementation
+void EnteringState::enter(NPC* npc) {
+  enteringTime = 0.0f;
+  stuckTimer = 0.0f;
+  lastPosition = npc->getPosition();
+  retryCount = 0;
+  phase = 0;
+
+  auto shop = npc->getTargetShop();
+  if (!shop) {
+    npc->setActive(false);
+    return;
+  }
+
+  // First, walk to a position in front of the entrance
+  Vector3 exitPos = shop->getExitPosition();
+  entranceTarget = {exitPos.x, 0.5f, exitPos.z};
+  npc->setDestination(entranceTarget);
+  npc->sayMessage("greeting");
+}
+
+void EnteringState::update(NPC* npc, float deltaTime) {
+  enteringTime += deltaTime;
+
+  auto shop = npc->getTargetShop();
+  if (!shop) {
+    npc->setActive(false);
+    return;
+  }
+
+  Vector3 currentPos = npc->getPosition();
+
+  // Check if already inside shop - success!
+  if (shop->isInsideShop(currentPos)) {
+    npc->notifyEnteredShop();
+    npc->changeState(std::make_unique<ShoppingState>());
+    return;
+  }
+
+  float distanceToTarget = Vector3Distance(currentPos, entranceTarget);
+
+  if (!npc->hasValidDestination()) {
+    npc->setDestination(entranceTarget);
+  }
+
+  // State machine for entering
+  if (phase == 0 && distanceToTarget < 2.0f) {
+    // Phase 0 complete: reached front of entrance, now go to entrance
+    phase = 1;
+    entranceTarget = shop->getEntrancePosition();
+    npc->setDestination(entranceTarget);
+    stuckTimer = 0.0f;
+    return;
+  }
+
+  if (phase == 1 && distanceToTarget < 1.5f) {
+    // Phase 1 complete: at entrance, now move inside
+    phase = 2;
+    Vector3 insidePos = shop->getEntrancePosition();
+    insidePos.z -= 3.0f;  // Move deeper into the shop
+    entranceTarget = insidePos;
+    npc->setDestination(entranceTarget);
+    stuckTimer = 0.0f;
+    return;
+  }
+
+  // Stuck detection
+  float movementDistance = Vector3Distance(currentPos, lastPosition);
+  if (movementDistance < GameSettings::NPC::STUCK_THRESHOLD) {
+    stuckTimer += deltaTime;
+  } else {
+    stuckTimer = std::max(0.0f, stuckTimer - deltaTime * 0.3f);
+  }
+  lastPosition = currentPos;
+
+  // If stuck, try alternative approaches based on current phase
+  if (stuckTimer > GameSettings::NPC::STUCK_TIMEOUT) {
+    retryCount++;
+    stuckTimer = 0.0f;
+
+    if (retryCount > 8) {
+      npc->setActive(false);
+      return;
+    }
+
+    // Try different approach based on phase
+    Vector3 shopPos = shop->getPosition();
+    Vector3 entrancePos = shop->getEntrancePosition();
+
+    if (phase == 0) {
+      // Try approaching from different angles
+      float xOffset = (retryCount % 2 == 0) ? 2.0f : -2.0f;
+      xOffset *= (retryCount / 2 + 1);
+      entranceTarget = {shopPos.x + xOffset, 0.5f, entrancePos.z + 4.0f};
+    } else {
+      // Try sliding into the entrance from the side
+      float xOffset = (retryCount % 2 == 0) ? 1.0f : -1.0f;
+      entranceTarget = {entrancePos.x + xOffset, 0.5f, entrancePos.z};
+    }
+
+    npc->setDestination(entranceTarget);
+  }
+
+  // Timeout
+  if (enteringTime > maxEnteringTime) {
+    npc->setActive(false);
+  }
+}
+
+void EnteringState::exit(NPC* /*npc*/) {}
 
 // LeavingState implementation
 void LeavingState::enter(NPC* npc) {
@@ -296,15 +462,14 @@ void LeavingState::enter(NPC* npc) {
   alternativeAttempts = 0;
   lastPosition = npc->getPosition();
 
-  Vector3 currentPos = npc->getPosition();
+  auto shop = npc->getTargetShop();
+  if (!shop) {
+    npc->setActive(false);
+    return;
+  }
 
-  // Calculate exit position outside the shop, not inside
-  // Move away from shop center towards exterior
-  Vector3 shopCenter = {0.0f, currentPos.y, -10.0f};
-  Vector3 awayFromShop = Vector3Subtract(currentPos, shopCenter);
-  awayFromShop = Vector3Normalize(awayFromShop);
-  exitTarget = Vector3Add(currentPos, Vector3Scale(awayFromShop, 20.0f));
-  exitTarget.y = currentPos.y;
+  // Use the shop's exit position method
+  exitTarget = shop->getExitPosition();
 
   hasExitTarget = true;
   npc->setDestination(exitTarget);
@@ -316,6 +481,10 @@ void LeavingState::update(NPC* npc, float deltaTime) {
 
   Vector3 currentPos = npc->getPosition();
   float distanceToExit = Vector3Distance(currentPos, exitTarget);
+
+  if (!npc->hasValidDestination()) {
+    npc->setDestination(exitTarget);
+  }
 
   updateStuckDetection(npc, deltaTime);
 
@@ -329,7 +498,7 @@ void LeavingState::update(NPC* npc, float deltaTime) {
   }
 }
 
-void LeavingState::exit(NPC* npc) { hasExitTarget = false; }
+void LeavingState::exit(NPC* /*npc*/) { hasExitTarget = false; }
 
 void LeavingState::updateStuckDetection(NPC* npc, float deltaTime) {
   Vector3 currentPos = npc->getPosition();
@@ -348,12 +517,14 @@ void LeavingState::handleStuckSituation(NPC* npc) {
 
   if (alternativeAttempts > 3) {
     npc->setActive(false);
-    npc->notifyExited();
     return;
   }
 
+  auto shop = npc->getTargetShop();
   Vector3 currentPos = npc->getPosition();
-  Vector3 shopCenter = {0.0f, currentPos.y, -10.0f};
+  Vector3 shopCenter = shop ? shop->getPosition() : Vector3{0.0f, 0.0f, -10.0f};
+  shopCenter.y = currentPos.y;
+
   Vector3 newTarget = calculateAlternativeTarget(npc, currentPos, shopCenter);
 
   exitTarget = newTarget;
@@ -363,23 +534,25 @@ void LeavingState::handleStuckSituation(NPC* npc) {
   stuckTimer = 0.0f;
 }
 
-Vector3 LeavingState::calculateAlternativeTarget(NPC* npc, Vector3 currentPos,
+Vector3 LeavingState::calculateAlternativeTarget(NPC* /*npc*/, Vector3 currentPos,
                                                  Vector3 shopCenter) {
   switch (alternativeAttempts) {
     case 1: {
-      Vector3 awayFromShop = Vector3Subtract(currentPos, shopCenter);
-      awayFromShop = Vector3Normalize(awayFromShop);
-      Vector3 perpendicular = {-awayFromShop.z, awayFromShop.y, awayFromShop.x};
+      Vector3 awayFromShop =
+          normalizeOrFallback(Vector3Subtract(currentPos, shopCenter));
+      Vector3 perpendicular = {-awayFromShop.z, 0.0f, awayFromShop.x};
       return Vector3Add(currentPos, Vector3Scale(perpendicular, 15.0f));
     }
     case 2: {
       Vector3 opposite = Vector3Subtract(currentPos, exitTarget);
-      opposite = Vector3Normalize(opposite);
+      opposite = normalizeOrFallback(
+          opposite, normalizeOrFallback(Vector3Subtract(currentPos, shopCenter)));
       return Vector3Add(currentPos, Vector3Scale(opposite, 20.0f));
     }
     case 3: {
-      float angle = alternativeAttempts * 90.0f * DEG2RAD;
-      return {cosf(angle) * 25.0f, currentPos.y, sinf(angle) * 25.0f};
+      Vector3 awayFromShop =
+          normalizeOrFallback(Vector3Subtract(currentPos, shopCenter));
+      return Vector3Add(currentPos, Vector3Scale(awayFromShop, 30.0f));
     }
     default:
       return currentPos;
@@ -387,17 +560,20 @@ Vector3 LeavingState::calculateAlternativeTarget(NPC* npc, Vector3 currentPos,
 }
 
 void LeavingState::handleReachedExit(NPC* npc, Vector3 currentPos) {
-  Vector3 shopCenter = {0.0f, currentPos.y, -10.0f};
+  auto shop = npc->getTargetShop();
+  Vector3 shopCenter = shop ? shop->getPosition() : Vector3{0.0f, 0.0f, -10.0f};
+  shopCenter.y = currentPos.y;
+
   float distanceFromShop = Vector3Distance(currentPos, shopCenter);
 
   if (distanceFromShop > GameSettings::NPC::SHOP_EXIT_DISTANCE) {
     npc->setActive(false);
-    npc->notifyExited();
     return;
   }
 
+  // Continue moving away from shop
   Vector3 awayFromShop = Vector3Subtract(currentPos, shopCenter);
-  awayFromShop = Vector3Normalize(awayFromShop);
+  awayFromShop = normalizeOrFallback(awayFromShop);
   exitTarget = Vector3Add(currentPos, Vector3Scale(awayFromShop, 25.0f));
   exitTarget.y = currentPos.y;
 

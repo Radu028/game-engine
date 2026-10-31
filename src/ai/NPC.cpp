@@ -20,8 +20,7 @@ Vector3 NPC::getTorsoPosition() const {
 }
 
 Vector3 NPC::getFeetPosition() const {
-  return character_ ? character_->getFeetPosition()
-                    : Vector3{0.0f, 0.0f, 0.0f};
+  return character_ ? character_->getFeetPosition() : Vector3{0.0f, 0.0f, 0.0f};
 }
 
 BoundingBox NPC::getBoundingBox() const {
@@ -34,8 +33,6 @@ NPC::NPC(Vector3 position, std::shared_ptr<Shop> shop, GameWorld* world)
       targetShop(std::move(shop)),
       chatSystem(nullptr),
       movementSpeed(3.0f),
-      detectionRadius(5.0f),
-      interactionRadius(1.0f),
       isActive(true),
       exitNotified(false),
       lifetimeTimer(0.0f),
@@ -123,7 +120,6 @@ void NPC::update(float deltaTime) {
 
   if (lifetimeTimer >= maxLifetime) {
     setActive(false);
-    notifyExited();
   }
 }
 
@@ -135,27 +131,41 @@ void NPC::moveTowards(Vector3 target, float deltaTime) {
   if (distanceToTarget > 0.3f) {
     direction = Vector3Normalize(direction);
 
-    bool isCloseToTarget = distanceToTarget < 4.0f;
+    // Check for potential collision and try to find alternative direction
+    float lookAheadDistance = std::max(1.0f, movementSpeed * deltaTime * 3.0f);
 
-    if (!isCloseToTarget &&
-        wouldCollideAfterMovement(direction, deltaTime * 2.0f)) {
-      float angle45 = PI / 4.0f;
-      Vector3 leftDirection = {
-          direction.x * cos(angle45) - direction.z * sin(angle45), direction.y,
-          direction.x * sin(angle45) + direction.z * cos(angle45)};
-      leftDirection = Vector3Normalize(leftDirection);
+    if (wouldCollideAfterMovement(direction, lookAheadDistance)) {
+      // Try multiple angles to find a clear path
+      const float angles[] = {PI / 6.0f, -PI / 6.0f,   // 30 degrees
+                              PI / 4.0f, -PI / 4.0f,   // 45 degrees
+                              PI / 3.0f, -PI / 3.0f,   // 60 degrees
+                              PI / 2.0f, -PI / 2.0f};  // 90 degrees
 
-      if (!wouldCollideAfterMovement(leftDirection, deltaTime * 2.0f)) {
-        direction = leftDirection;
-      } else {
-        Vector3 rightDirection = {
-            direction.x * cos(-angle45) - direction.z * sin(-angle45),
-            direction.y,
-            direction.x * sin(-angle45) + direction.z * cos(-angle45)};
-        rightDirection = Vector3Normalize(rightDirection);
+      bool foundClear = false;
+      for (float angle : angles) {
+        Vector3 testDir = {direction.x * cos(angle) - direction.z * sin(angle),
+                           direction.y,
+                           direction.x * sin(angle) + direction.z * cos(angle)};
+        testDir = Vector3Normalize(testDir);
 
-        if (!wouldCollideAfterMovement(rightDirection, deltaTime * 2.0f)) {
-          direction = rightDirection;
+        if (!wouldCollideAfterMovement(testDir, lookAheadDistance)) {
+          direction = testDir;
+          foundClear = true;
+          break;
+        }
+      }
+
+      // If no clear direction found, try moving perpendicular to the wall
+      if (!foundClear) {
+        // Try to slide along the obstacle
+        Vector3 slideDir = {-direction.z, 0.0f, direction.x};
+        if (!wouldCollideAfterMovement(slideDir, lookAheadDistance * 0.5f)) {
+          direction = slideDir;
+        } else {
+          slideDir = {direction.z, 0.0f, -direction.x};
+          if (!wouldCollideAfterMovement(slideDir, lookAheadDistance * 0.5f)) {
+            direction = slideDir;
+          }
         }
       }
     }
@@ -169,191 +179,201 @@ bool NPC::isNearTarget(Vector3 target, float threshold) const {
   return Vector3Distance(getPosition(), target) <= threshold;
 }
 
-void NPC::setDestination(Vector3 destination) {
+void NPC::setActive(bool active) {
+  if (isActive == active) {
+    return;
+  }
+
+  isActive = active;
+
+  if (!isActive) {
+    hasDestination = false;
+    pathWaypoints.clear();
+    currentWaypointIndex = 0;
+    notifyExited();
+  }
+}
+
+bool NPC::setDestination(Vector3 destination) {
   currentDestination = destination;
-  hasDestination = true;
   pathWaypoints.clear();
   currentWaypointIndex = 0;
+  waypointAttempts = 0;
+  lastWaypointIndex = -1;
+  stuckTimer = 0.0f;
+  hasTriedAlternative = false;
+
+  const Vector3 currentPos = getPosition();
 
   if (navMesh) {
-    std::vector<Vector3> path = navMesh->findPath(getPosition(), destination);
-    if (!path.empty()) {
-      pathWaypoints = path;
-    } else {
-      // Enhanced fallback strategy for failed pathfinding
-      Vector3 currentPos = getPosition();
+    std::vector<Vector3> path = navMesh->findPath(currentPos, destination);
 
-      // Strategy 1: Try intermediate positions toward the target
-      Vector3 direction = Vector3Subtract(destination, currentPos);
-      float totalDistance = Vector3Length(direction);
-
-      if (totalDistance > 0.1f) {
-        direction = Vector3Normalize(direction);
-
-        // Try positions at 25%, 50%, and 75% of the way to destination
-        std::vector<float> distances = {
-            totalDistance * 0.25f, totalDistance * 0.5f, totalDistance * 0.75f};
-
-        for (float distance : distances) {
-          Vector3 intermediatePos =
-              Vector3Add(currentPos, Vector3Scale(direction, distance));
-          if (navMesh->isWalkable(intermediatePos)) {
-            std::vector<Vector3> partialPath =
-                navMesh->findPath(currentPos, intermediatePos);
-            if (!partialPath.empty()) {
-              pathWaypoints = partialPath;
-              break;  // Use first successful partial path
-            }
-          }
-        }
+    if (path.empty()) {
+      const auto& nodes = navMesh->getNodes();
+      const int endNode = navMesh->findNearestNode(destination);
+      if (endNode >= 0 && endNode < static_cast<int>(nodes.size())) {
+        path = navMesh->findPath(
+            currentPos, nodes[static_cast<size_t>(endNode)].position);
       }
 
-      // Strategy 2: If still no path, try nearby accessible areas
-      if (pathWaypoints.empty()) {
-        // Find the nearest walkable position to our current location
-        Vector3 nearestWalkable = findNearestWalkablePosition(currentPos, 5.0f);
-        if (Vector3Distance(nearestWalkable, currentPos) > 0.5f) {
-          std::vector<Vector3> escapeePath =
-              navMesh->findPath(currentPos, nearestWalkable);
-          if (!escapeePath.empty()) {
-            pathWaypoints = escapeePath;
-          }
+      if (path.empty()) {
+        const int startNode = navMesh->findNearestNode(currentPos);
+        if (startNode >= 0 && endNode >= 0 &&
+            startNode < static_cast<int>(nodes.size()) &&
+            endNode < static_cast<int>(nodes.size())) {
+          path = navMesh->findPath(
+              nodes[static_cast<size_t>(startNode)].position,
+              nodes[static_cast<size_t>(endNode)].position);
         }
-      }
-
-      // Strategy 3: Emergency movement - direct movement without pathfinding
-      if (pathWaypoints.empty()) {
-        // Create a simple straight-line path with a few waypoints
-        Vector3 midPoint = Vector3Add(
-            currentPos, Vector3Scale(direction, totalDistance * 0.5f));
-        midPoint.y = 0.5f;  // Ensure ground level
-
-        pathWaypoints.push_back(currentPos);
-        pathWaypoints.push_back(midPoint);
-        pathWaypoints.push_back(destination);
       }
     }
+
+    if (path.empty()) {
+      Vector3 nearbyTarget = findNearestWalkablePosition(destination, 5.0f);
+      if (Vector3Distance(nearbyTarget, currentPos) > 0.25f) {
+        path = navMesh->findPath(currentPos, nearbyTarget);
+      }
+    }
+
+    if (path.empty()) {
+      hasDestination = false;
+      return false;
+    }
+
+    while (path.size() > 1 &&
+           Vector3Distance(currentPos, path.front()) < 0.45f) {
+      path.erase(path.begin());
+    }
+
+    pathWaypoints = std::move(path);
+    hasDestination = true;
+    return true;
   } else {
-    // No navigation mesh available - create direct path
-    pathWaypoints.push_back(getPosition());
+    // No navigation mesh available: move directly.
     pathWaypoints.push_back(destination);
+    hasDestination = true;
+    return true;
   }
 }
 
 void NPC::followPath(float deltaTime) {
   if (!hasDestination) return;
 
-  if (!pathWaypoints.empty() && currentWaypointIndex < pathWaypoints.size()) {
-    Vector3 currentWaypoint = pathWaypoints[currentWaypointIndex];
-    float distanceToWaypoint = Vector3Distance(getPosition(), currentWaypoint);
+  auto clearDestination = [&]() {
+    hasDestination = false;
+    pathWaypoints.clear();
+    currentWaypointIndex = 0;
+    waypointAttempts = 0;
+    lastWaypointIndex = -1;
+    stuckTimer = 0.0f;
+    hasTriedAlternative = false;
+  };
 
-    // Dynamic waypoint threshold based on movement speed and situation
-    float baseThreshold = 1.0f;
-    float waypointThreshold = baseThreshold;
-
-    // Reset tracking variables when moving to a new waypoint
-    if (lastWaypointIndex != currentWaypointIndex) {
-      waypointAttempts = 0;
-      lastWaypointIndex = currentWaypointIndex;
-      stuckTimer = 0.0f;
-      hasTriedAlternative = false;
+  if (pathWaypoints.empty() ||
+      currentWaypointIndex >= static_cast<int>(pathWaypoints.size())) {
+    if (Vector3Distance(getPosition(), currentDestination) < 1.5f) {
+      clearDestination();
+      return;
     }
-    waypointAttempts++;
 
-    // Enhanced stuck detection
-    float movementDistance = Vector3Distance(getPosition(), lastPosition);
-    bool isMoving =
-        movementDistance > 0.02f;  // More sensitive movement detection
-
-    if (!isMoving) {
-      stuckTimer += deltaTime;
-    } else {
-      stuckTimer = std::max(
-          0.0f,
-          stuckTimer -
-              deltaTime * 0.5f);  // Gradually reduce stuck timer when moving
-    }
-    lastPosition = getPosition();
-
-    // Progressive response to being stuck
-    if (stuckTimer > 2.0f && !hasTriedAlternative && navMesh) {
-      // First attempt: Try alternative path
-      std::vector<Vector3> alternativePath = navMesh->findAlternativePath(
-          getPosition(), currentDestination, currentWaypoint);
-
-      if (!alternativePath.empty() && alternativePath.size() > 1) {
-        pathWaypoints = alternativePath;
-        currentWaypointIndex = 0;
-        hasTriedAlternative = true;
-        stuckTimer = 0.0f;
-      } else {
-        // Second attempt: Skip to next waypoint
-        currentWaypointIndex++;
-        hasTriedAlternative = true;
-        stuckTimer = 0.0f;
+    if (navMesh) {
+      if (!setDestination(currentDestination)) {
+        clearDestination();
       }
-    } else if (stuckTimer > 4.0f) {
-      // Third attempt: Emergency unstuck procedure
-      Vector3 unstuckPosition =
-          findNearestWalkablePosition(getPosition(), 3.0f);
-      if (Vector3Distance(unstuckPosition, getPosition()) > 0.5f) {
-        // Move to unstuck position first
-        setDestination(unstuckPosition);
-        return;
-      } else {
-        // Force skip multiple waypoints
-        currentWaypointIndex =
-            std::min(currentWaypointIndex + 2,
-                     static_cast<int>(pathWaypoints.size()) - 1);
-        stuckTimer = 0.0f;
-        hasTriedAlternative = false;
-      }
+      return;
     }
 
-    // Progressive waypoint threshold increase for difficult waypoints
-    if (waypointAttempts > 200) {  // Reduced from 300
-      waypointThreshold = baseThreshold * 1.5f;
-    }
-    if (waypointAttempts > 400) {  // Reduced from 600
-      waypointThreshold = baseThreshold * 2.0f;
-    }
-    if (waypointAttempts > 600) {  // Force skip after many attempts
-      currentWaypointIndex++;
-      waypointAttempts = 0;
-      hasTriedAlternative = false;
-      stuckTimer = 0.0f;
-    }
+    moveTowards(currentDestination, deltaTime);
+    return;
+  }
 
-    // Check if we've reached the current waypoint
-    if (distanceToWaypoint < waypointThreshold) {
-      currentWaypointIndex++;
-      waypointAttempts = 0;
-      stuckTimer = 0.0f;
+  while (currentWaypointIndex < static_cast<int>(pathWaypoints.size()) &&
+         Vector3Distance(getPosition(), pathWaypoints[currentWaypointIndex]) <
+             0.35f) {
+    currentWaypointIndex++;
+  }
 
-      if (currentWaypointIndex >= pathWaypoints.size()) {
-        // Reached destination
-        hasDestination = false;
-        pathWaypoints.clear();
-        currentWaypointIndex = 0;
-      }
-    } else {
-      // Move towards current waypoint
-      moveTowards(currentWaypoint, deltaTime);
-    }
-  } else {
-    // No waypoints available - direct movement to destination
-    float distanceToDestination =
-        Vector3Distance(getPosition(), currentDestination);
-
-    if (distanceToDestination < 1.5f) {
-      // Close enough to destination
-      hasDestination = false;
-      pathWaypoints.clear();
-      currentWaypointIndex = 0;
+  if (currentWaypointIndex >= static_cast<int>(pathWaypoints.size())) {
+    if (Vector3Distance(getPosition(), currentDestination) < 1.5f) {
+      clearDestination();
+    } else if (navMesh) {
+      setDestination(currentDestination);
     } else {
       moveTowards(currentDestination, deltaTime);
     }
+    return;
   }
+
+  Vector3 currentWaypoint = pathWaypoints[currentWaypointIndex];
+  float distanceToWaypoint = Vector3Distance(getPosition(), currentWaypoint);
+  float baseThreshold = 0.9f;
+  float waypointThreshold = baseThreshold;
+
+  if (lastWaypointIndex != currentWaypointIndex) {
+    waypointAttempts = 0;
+    lastWaypointIndex = currentWaypointIndex;
+    stuckTimer = 0.0f;
+    hasTriedAlternative = false;
+  }
+  waypointAttempts++;
+
+  float movementDistance = Vector3Distance(getPosition(), lastPosition);
+  if (movementDistance < 0.02f) {
+    stuckTimer += deltaTime;
+  } else {
+    stuckTimer = std::max(0.0f, stuckTimer - deltaTime * 0.5f);
+  }
+  lastPosition = getPosition();
+
+  if (stuckTimer > 2.0f && !hasTriedAlternative && navMesh) {
+    std::vector<Vector3> alternativePath =
+        navMesh->findAlternativePath(getPosition(), currentDestination,
+                                     currentWaypoint);
+
+    hasTriedAlternative = true;
+    stuckTimer = 0.0f;
+
+    if (!alternativePath.empty()) {
+      pathWaypoints = std::move(alternativePath);
+      currentWaypointIndex = 0;
+    }
+    return;
+  }
+
+  if (stuckTimer > 4.0f && navMesh) {
+    if (setDestination(currentDestination)) {
+      stuckTimer = 0.0f;
+      hasTriedAlternative = false;
+      return;
+    }
+
+    currentWaypointIndex = std::min(currentWaypointIndex + 1,
+                                    static_cast<int>(pathWaypoints.size()) - 1);
+    stuckTimer = 0.0f;
+    hasTriedAlternative = false;
+  }
+
+  if (waypointAttempts > 160) {
+    waypointThreshold = baseThreshold * 1.5f;
+  }
+  if (waypointAttempts > 320) {
+    waypointThreshold = baseThreshold * 2.0f;
+  }
+  if (waypointAttempts > 500) {
+    currentWaypointIndex++;
+    waypointAttempts = 0;
+    hasTriedAlternative = false;
+    stuckTimer = 0.0f;
+  }
+
+  if (distanceToWaypoint < waypointThreshold) {
+    currentWaypointIndex++;
+    waypointAttempts = 0;
+    stuckTimer = 0.0f;
+    return;
+  }
+
+  moveTowards(currentWaypoint, deltaTime);
 }
 
 void NPC::addObserver(NPCObserver* observer) {
@@ -443,9 +463,22 @@ float NPC::getVerticalCollisionContactTime(const Vector3& verticalMovement,
 Vector3 NPC::calculateRandomColor() const {
   static std::random_device rd;
   static std::mt19937 gen(rd());
-  std::uniform_real_distribution<float> colorDist(0.3f, 1.0f);
+  static const Color palette[] = {
+      {0, 162, 232, 255},   // Classic Roblox bright blue
+      {34, 177, 76, 255},   // Green
+      {237, 28, 36, 255},   // Red
+      {255, 127, 39, 255},  // Orange
+      {255, 242, 0, 255},   // Yellow
+      {163, 73, 164, 255},  // Purple
+      {112, 146, 190, 255}  // Slate blue
+  };
+  std::uniform_int_distribution<size_t> indexDist(
+      0, sizeof(palette) / sizeof(palette[0]) - 1);
 
-  return {colorDist(gen), colorDist(gen), colorDist(gen)};
+  const Color picked = palette[indexDist(gen)];
+  return {static_cast<float>(picked.r) / 255.0f,
+          static_cast<float>(picked.g) / 255.0f,
+          static_cast<float>(picked.b) / 255.0f};
 }
 
 Vector3 NPC::findNearestWalkablePosition(Vector3 center, float radius) const {

@@ -34,23 +34,23 @@ static const Vector3 OFFSET = {0.0f, 3.0f, 8.0f};
 static constexpr float TARGET_Y_OFFSET = 1.5f;
 }  // namespace Camera
 
-// Body part proportions for blocky character style
+// Body part proportions for blocky Roblox-style character
 namespace BodyParts {
-// Head proportions (cubic/blocky style)
-static const Vector3 HEAD_SIZE = {0.5f, 0.5f, 0.5f};
-static const Color HEAD_COLOR = YELLOW;
+// Head proportions (cubic/blocky style - Roblox heads are bigger)
+static const Vector3 HEAD_SIZE = {0.6f, 0.6f, 0.6f};
+static const Color HEAD_COLOR = {255, 204, 153, 255};  // Skin tone
 
-// Torso proportions (brick-like proportions)
-static const Vector3 TORSO_SIZE = {0.7f, 0.9f, 0.4f};
-static const Color TORSO_COLOR = BLUE;
+// Torso proportions (brick-like Roblox torso)
+static const Vector3 TORSO_SIZE = {0.8f, 1.0f, 0.4f};
+static const Color TORSO_COLOR = {0, 162, 232, 255};  // Bright blue shirt
 
-// Arms proportions (proportional to torso)
-static const Vector3 ARM_SIZE = {0.25f, 0.6f, 0.25f};
-static const Color ARM_COLOR = YELLOW;
+// Arms proportions (Roblox arms)
+static const Vector3 ARM_SIZE = {0.25f, 0.8f, 0.25f};
+static const Color ARM_COLOR = {255, 204, 153, 255};  // Skin tone
 
-// Legs proportions (proportional and stable)
-static const Vector3 LEG_SIZE = {0.3f, 0.7f, 0.3f};
-static const Color LEG_COLOR = RED;
+// Legs proportions (Roblox legs)
+static const Vector3 LEG_SIZE = {0.35f, 0.8f, 0.35f};
+static const Color LEG_COLOR = {34, 139, 34, 255};  // Green pants
 
 // Positioning offsets for character proportions
 static constexpr float ARM_OFFSET_X = 0.48f;  // Distance from center to arms
@@ -155,16 +155,19 @@ inline float getGroundYFromPhysicsCenterY(float physicsCenterY) {
 
 // NPC AI constants
 namespace NPC {
-static constexpr float LOOKING_AT_SHELF_TIME = 10.0f;
-static constexpr float CHAT_INTERVAL = 4.0f;
-static constexpr float ARRIVAL_THRESHOLD = 2.5f;
-static constexpr float MAX_SHOPPING_TIME = 90.0f;
-static constexpr float MAX_WANDER_TIME = 5.0f;
-static constexpr float LEAVE_PROBABILITY = 0.1f;
-static constexpr float STUCK_THRESHOLD = 0.02f;
-static constexpr float STUCK_TIMEOUT = 7.0f;
-static constexpr float EXIT_DISTANCE = 2.0f;
-static constexpr float SHOP_EXIT_DISTANCE = 15.0f;
-static constexpr int MIN_SHELVES_TO_VISIT = 2;
+static constexpr float LOOKING_AT_SHELF_TIME =
+    3.0f;  // Reduced for faster shopping
+static constexpr float CHAT_INTERVAL = 5.0f;
+static constexpr float ARRIVAL_THRESHOLD = 2.0f;
+static constexpr float MAX_SHOPPING_TIME = 60.0f;
+static constexpr float MAX_WANDER_TIME = 4.0f;
+static constexpr float LEAVE_PROBABILITY =
+    0.15f;  // Slightly more likely to leave
+static constexpr float STUCK_THRESHOLD =
+    0.015f;                                   // More sensitive stuck detection
+static constexpr float STUCK_TIMEOUT = 5.0f;  // Faster response to being stuck
+static constexpr float EXIT_DISTANCE = 2.5f;
+static constexpr float SHOP_EXIT_DISTANCE = 12.0f;
+static constexpr int MIN_SHELVES_TO_VISIT = 1;  // Reduced - buy faster
 }  // namespace NPC
 }  // namespace GameSettings

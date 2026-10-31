@@ -5,6 +5,12 @@
 #include "GameWorld.h"
 #include "ai/NPCManager.h"
 
+namespace {
+constexpr float kNpcSpawnIntervalMin = 2.5f;
+constexpr float kNpcSpawnIntervalMax = 5.0f;
+constexpr int kMaxActiveNpcs = 5;
+}  // namespace
+
 GameManager* GameManager::instance = nullptr;
 
 GameManager::GameManager()
@@ -20,12 +26,17 @@ GameManager::GameManager()
     world->finalizeObstacles();
   }
 
+  // Ensure the entrance area is walkable after obstacles are finalized
+  if (shop) {
+    shop->ensureEntranceWalkable();
+  }
+
   npcManager = NPCManager::getInstance();
   if (npcManager && shop) {
     npcManager->setShop(shop);
     npcManager->setChatSystem(chatSystem.get());
-    npcManager->setSpawnInterval(2.0f, 4.0f);
-    npcManager->setMaxActiveNPCs(5);
+    npcManager->setSpawnInterval(kNpcSpawnIntervalMin, kNpcSpawnIntervalMax);
+    npcManager->setMaxActiveNPCs(kMaxActiveNpcs);
   }
 }
 
@@ -184,7 +195,7 @@ void GameManager::setShop(std::shared_ptr<Shop> newShop) {
   }
 }
 
-void GameManager::updateGameLogic(float deltaTime) {
+void GameManager::updateGameLogic(float /*deltaTime*/) {
   // Update game-specific logic here
 
   // Sync statistics with NPC manager

@@ -75,6 +75,28 @@ Release\GameProject.exe
 - **Debug**: F1 for debug mode, F2 for dynamic sun toggle
 - **Reset**: R key to reset the game
 
+## Testing
+
+```bash
+/opt/homebrew/bin/cmake -S . -B build
+/opt/homebrew/bin/cmake --build build -j$(sysctl -n hw.ncpu)
+/opt/homebrew/bin/ctest --test-dir build --output-on-failure
+```
+
+Stress smoke (longer integration run):
+
+```bash
+RUNS=8 STEPS=24000 OBSTACLE_SETS=24 ./scripts/run_stress_smoke.sh build
+```
+
+Sanitizers (Address + Undefined Behavior):
+
+```bash
+/opt/homebrew/bin/cmake -S . -B build_asan -DENABLE_SANITIZERS=ON -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
+/opt/homebrew/bin/cmake --build build_asan -j$(sysctl -n hw.ncpu)
+ASAN_OPTIONS=detect_leaks=1 /opt/homebrew/bin/ctest --test-dir build_asan --output-on-failure
+```
+
 ## License
 
 MIT License
@@ -82,4 +104,3 @@ MIT License
 ## Author
 
 Radu Popa
-

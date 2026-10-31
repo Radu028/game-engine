@@ -35,8 +35,6 @@ class NPC {
 
   // AI parameters
   float movementSpeed;
-  float detectionRadius;
-  float interactionRadius;
   bool isActive;
   bool exitNotified;
   float lifetimeTimer;
@@ -82,7 +80,7 @@ class NPC {
   std::shared_ptr<Shop> getTargetShop() const { return targetShop; }
 
   // Pathfinding
-  void setDestination(Vector3 destination);
+  bool setDestination(Vector3 destination);
   Vector3 getCurrentDestination() const { return currentDestination; }
   bool hasValidDestination() const { return hasDestination; }
   void followPath(float deltaTime);
@@ -103,7 +101,7 @@ class NPC {
 
   bool getIsActive() const { return isActive; }
 
-  void setActive(bool active) { isActive = active; }
+  void setActive(bool active);
   void setChatSystem(NPCChatSystem* chat) { chatSystem = chat; }
 
   void removeFromPhysics(btDiscreteDynamicsWorld* world);

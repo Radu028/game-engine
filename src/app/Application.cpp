@@ -24,6 +24,8 @@ constexpr float kMaxCameraDistance = 50.0f;
 constexpr float kMaxVerticalAngle = 89.0f;
 constexpr float kMinVerticalAngle = -89.0f;
 constexpr float kScrollScale = 2.0f;
+const Color kSkyColor = {135, 206, 235, 255};
+const Color kBaseplateColor = {88, 168, 94, 255};
 }  // namespace
 
 namespace {
@@ -106,7 +108,8 @@ void Application::initialize() {
   playerController = std::make_unique<PlayerController>(playerCharacter);
 
   world->addObject(std::make_shared<Floor>(
-      Vector3{0.0f, 0.0f, 0.0f}, Vector3{50.0f, 1.0f, 50.0f}, DARKGREEN, true));
+      Vector3{0.0f, 0.0f, 0.0f}, Vector3{50.0f, 1.0f, 50.0f}, kBaseplateColor,
+      true));
 
   gameManager = GameManager::getInstance();
 }
@@ -145,7 +148,7 @@ void Application::render() {
   if (shaderSystem) shaderSystem->updateUniforms(camera);
 
   renderer.beginFrame();
-  renderer.clearBackground(RAYWHITE);
+  renderer.clearBackground(kSkyColor);
   renderer.begin3D(camera);
 
   if (world) world->draw();

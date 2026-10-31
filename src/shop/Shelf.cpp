@@ -12,7 +12,8 @@ Shelf::Shelf(Vector3 position, Vector3 size, Color color)
       fruitSpacing(0.3f) {}
 
 void Shelf::addFruit(std::shared_ptr<Fruit> fruit) {
-  if (fruits.size() < maxFruits && fruit && !fruit->getIsPicked()) {
+  if (fruits.size() < static_cast<size_t>(maxFruits) && fruit &&
+      !fruit->getIsPicked()) {
     fruits.push_back(fruit);
     arrangeFruits();
   }
@@ -65,7 +66,8 @@ void Shelf::restockShelf(FruitType type, int quantity) {
   int currentCount = getFruitCount(type);
   int needed = quantity - currentCount;
 
-  for (int i = 0; i < needed && fruits.size() < maxFruits; ++i) {
+  for (int i = 0;
+       i < needed && fruits.size() < static_cast<size_t>(maxFruits); ++i) {
     Vector3 fruitPos = calculateFruitPosition(fruits.size());
     auto newFruit = std::make_shared<Fruit>(fruitPos, type);
     addFruit(newFruit);

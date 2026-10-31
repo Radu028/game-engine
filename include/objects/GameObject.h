@@ -53,7 +53,7 @@ class GameObject {
     }
   }
 
-  virtual void update(float deltaTime) {};
+  virtual void update(float /*deltaTime*/) {}
   virtual void interact() {};
   virtual bool checkCollisionWith(const BoundingBox& otherBox) const;
   virtual float getVerticalCollisionContactTime(

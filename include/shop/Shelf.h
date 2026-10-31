@@ -16,8 +16,9 @@ class Shelf : public CubeObject {
   float fruitSpacing;
 
  public:
-  Shelf(Vector3 position, Vector3 size = {2.0f, 0.2f, 0.8f},
-        Color color = BROWN);
+  // Roblox-style wooden shelf
+  Shelf(Vector3 position, Vector3 size = {2.5f, 0.15f, 1.0f},
+        Color color = {139, 90, 43, 255});
   ~Shelf() override = default;
 
   void addFruit(std::shared_ptr<Fruit> fruit);

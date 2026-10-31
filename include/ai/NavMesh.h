@@ -83,6 +83,7 @@ class NavMesh {
   void removeObstacle(Vector3 position, Vector3 size);
   void markNodesInArea(Vector3 center, Vector3 size, bool walkable,
                        float expansionFactor = 0.5f);
+  void ensureAreaWalkable(Vector3 center, Vector3 size);
   bool isPositionBlocked(Vector3 position) const;
 
   // Pathfinding

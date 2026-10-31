@@ -66,7 +66,6 @@ float GameObject::getVerticalCollisionContactTime(
     return 1.0f;
   }
 
-  Vector3 originalPosition = getPosition();
   float t0 = 0.0f;
   float t1 = 1.0f;
   float tMid;

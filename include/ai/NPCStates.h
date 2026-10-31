@@ -29,7 +29,7 @@ class IdleState : public NPCState {
 
  private:
   float idleTime = 0.0f;
-  const float maxIdleTime = 2.0f;  // Increased from 0.5f to 2.0f
+  const float maxIdleTime = 2.0f;
 };
 
 class ShoppingState : public NPCState {
@@ -51,8 +51,8 @@ class ShoppingState : public NPCState {
   void moveToShelf(NPC* npc, std::shared_ptr<Shelf> shelf);
   bool shouldLeaveShop(NPC* npc) const;
 
-  float shoppingTime = 10.0f;
-  float maxShoppingTime = 20.0f;
+  float shoppingTime = 0.0f;
+  float maxShoppingTime = 0.0f;
   float fruitSearchTimer = 0.0f;
   float shelfLookingTimer = 0.0f;
   float chatTimer = 0.0f;
@@ -60,7 +60,7 @@ class ShoppingState : public NPCState {
   bool isLookingAtShelf = false;
   bool hasPurchasedSomething = false;
   int shelvesVisited = 0;
-  int minShelvesToVisit = 2;
+  int minShelvesToVisit = 0;
   std::shared_ptr<Shelf> currentShelf = nullptr;
 };
 
@@ -74,8 +74,25 @@ class WanderingState : public NPCState {
  private:
   Vector3 wanderTarget;
   float wanderTime = 0.0f;
-  float maxWanderTime = 3.0f;
+  float maxWanderTime = 0.0f;
   bool hasWanderTarget = false;
+};
+
+class EnteringState : public NPCState {
+ public:
+  void enter(NPC* npc) override;
+  void update(NPC* npc, float deltaTime) override;
+  void exit(NPC* npc) override;
+  std::string getName() override { return "Entering"; }
+
+ private:
+  Vector3 entranceTarget = {0, 0, 0};
+  float enteringTime = 0.0f;
+  float maxEnteringTime = 25.0f;
+  Vector3 lastPosition = {0, 0, 0};
+  float stuckTimer = 0.0f;
+  int retryCount = 0;
+  int phase = 0;  // 0 = approach, 1 = enter, 2 = inside
 };
 
 class LeavingState : public NPCState {

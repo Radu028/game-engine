@@ -51,6 +51,7 @@ GameWorld::~GameWorld() {
 
 void GameWorld::addObject(std::shared_ptr<GameObject> object) {
   if (!object) return;
+  if (std::find(objects.begin(), objects.end(), object) != objects.end()) return;
 
   objects.push_back(object);
   const PhysicsBodyConfig config = object->getPhysicsConfig();
@@ -107,8 +108,9 @@ void GameWorld::initializeNavMesh() {
   const Vector3 maxBounds{25.0f, 0.0f, 25.0f};
   const float groundLevel = 0.0f;
 
+  // Reduced node spacing for better resolution (0.8 = ~3x more nodes)
   navigationMesh =
-      std::make_shared<NavMesh>(minBounds, maxBounds, 1.2f, groundLevel);
+      std::make_shared<NavMesh>(minBounds, maxBounds, 0.8f, groundLevel);
   navigationMesh->generateNavMesh();
 
   for (const auto& object : objects) {
@@ -122,18 +124,8 @@ void GameWorld::initializeNavMesh() {
 
 void GameWorld::addObjectAsObstacle(std::shared_ptr<GameObject> object,
                                     const std::string& type) {
-  if (!object) return;
-
+  (void)type;
   addObject(object);
-  if (!navigationMesh) return;
-  if (!navigationMesh->shouldObjectBlockPath(object.get())) return;
-
-  const Vector3 position = object->getPosition();
-  const Vector3 size = object->getObstacleSize();
-  const std::string obstacleType =
-      type.empty() ? object->getObstacleType() : type;
-
-  navigationMesh->addObstacle(position, size, obstacleType);
 }
 
 void GameWorld::removeObjectObstacle(std::shared_ptr<GameObject> object) {
@@ -154,21 +146,8 @@ void GameWorld::addObstacleAt(Vector3 position, Vector3 size,
 
 void GameWorld::addObjectAsObstacleDeferred(std::shared_ptr<GameObject> object,
                                             const std::string& type) {
-  if (!object) return;
-
+  (void)type;
   addObject(object);
-  if (!navigationMesh) return;
-  if (!navigationMesh->shouldObjectBlockPath(object.get())) return;
-
-  const Vector3 position = object->getPosition();
-  const Vector3 size = object->getObstacleSize();
-  const std::string obstacleType =
-      type.empty() ? object->getObstacleType() : type;
-
-  const float weight = obstacleType == "shelf"  ? 0.7f
-                       : obstacleType == "wall" ? 0.3f
-                                                : 0.5f;
-  navigationMesh->markNodesInArea(position, size, false, weight);
 }
 
 void GameWorld::finalizeObstacles() {

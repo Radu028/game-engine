@@ -44,8 +44,8 @@ std::string resolveResourcePathOrThrow(const std::string& relativePath) {
 
 ShaderSystem::ShaderSystem()
     : sunDirection({-0.3f, -1.0f, -0.4f}),
-      sunColor({1.0f, 0.9f, 0.7f}),
-      ambientStrength(0.5f),
+      sunColor({1.0f, 0.94f, 0.82f}),
+      ambientStrength(0.42f),
       sunDirectionLoc(-1),
       sunColorLoc(-1),
       ambientStrengthLoc(-1) {
